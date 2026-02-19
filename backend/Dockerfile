@@ -1,16 +1,17 @@
 FROM python:3.11-slim
 
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем requirements
-COPY requirements.txt .
+# Копируем requirements.txt из папки backend
+COPY backend/requirements.txt .
 
-# Устанавливаем Python пакеты (без компиляции!)
+# Устанавливаем Python пакеты
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Копируем весь код
-COPY . .
+# Копируем весь код из backend
+COPY backend/ .
 
 # Открываем порт
 EXPOSE 10000
