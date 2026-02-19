@@ -1,0 +1,40 @@
+﻿# Node.js - ВАЖНО!
+node_modules/
+.next/
+.nuxt/
+build/
+dist/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-wheel-metadata/
+
+# Secrets - НИКОГДА не коммить!
+authorized_key.json
+*.key
+*.pem
+.env
+*.env.*
+!*.env.example
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitlab-ci.yml
