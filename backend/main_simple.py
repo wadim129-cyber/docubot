@@ -47,7 +47,7 @@ class ExtractedData(BaseModel):
     parties: List[str] = Field(default_factory=list)
     total_amount: Optional[float] = None
     currency: Optional[str] = "RUB"
-    dates: Dict[str, str] = Field(default_factory=dict)
+    dates: Dict[str, Optional[str]] = Field(default_factory=dict)  # ← Optional[str] вместо str
     obligations: List[str] = Field(default_factory=list)
     penalties: Optional[str] = None
 
