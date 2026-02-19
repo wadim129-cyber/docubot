@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: docubot-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main_simple:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: YANDEX_FOLDER_ID
+        value: b1gdcuaq0il54iojm93b
+      - key: PORT
+        value: 10000
