@@ -71,8 +71,17 @@ class YandexGPTService:
         self.iam_token = None
         self.token_expires_at = 0
         
-        with open(key_path, 'r', encoding='utf-8') as f:
-            self.key_data = json.load(f)
+        # 🔑 Читаем ключ из переменной окружения ИЛИ из файла
+        key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
+        if key_content:
+            # Парсим JSON из строки
+            self.key_data = json.loads(key_content)
+            logger.info("✅ Ключ загружен из переменной окружения")
+        else:
+            # Фоллбэк на файл (для локальной разработки)
+            logger.info(f"📁 Пробуем загрузить ключ из файла: {key_path}")
+            with open(key_path, 'r', encoding='utf-8') as f:
+                self.key_data = json.load(f)
         
         self.service_account_id = self.key_data['service_account_id']
         self.private_key = self.key_data['private_key']
