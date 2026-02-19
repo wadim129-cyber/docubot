@@ -46,7 +46,7 @@ class ExtractedData(BaseModel):
     document_type: DocumentType
     parties: List[str] = Field(default_factory=list)
     total_amount: Optional[float] = None
-    currency: str = "RUB"
+    currency: Optional[str] = "RUB"
     dates: Dict[str, str] = Field(default_factory=dict)
     obligations: List[str] = Field(default_factory=list)
     penalties: Optional[str] = None
