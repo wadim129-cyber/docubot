@@ -18,7 +18,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . .
 
 # Открываем порт
-EXPOSE $PORT
+EXPOSE 10000
 
-# Запускаем
-CMD ["uvicorn", "main_simple:app", "--host", "0.0.0.0", "--port", "$PORT"]
+# Запускаем (используем shell формат для работы $PORT)
+CMD uvicorn main_simple:app --host 0.0.0.0 --port ${PORT:-10000}
