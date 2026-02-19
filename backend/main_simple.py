@@ -67,6 +67,7 @@ class DocumentUploadResponse(BaseModel):
 
 class YandexGPTService:
     def __init__(self, folder_id: str, key_path: str):
+<<<<<<< HEAD
         self.folder_id = folder_id
         self.iam_token = None
         self.token_expires_at = 0
@@ -86,6 +87,25 @@ class YandexGPTService:
         self.service_account_id = self.key_data['service_account_id']
         self.private_key = self.key_data['private_key']
         self.key_id = self.key_data['id']
+=======
+    self.folder_id = folder_id
+    self.iam_token = None
+    self.token_expires_at = 0
+    
+    # 🔑 Читаем ключ из переменной окружения ИЛИ из файла
+    key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
+    if key_content:
+        self.key_data = json.loads(key_content)
+        logger.info("✅ Ключ загружен из переменной окружения")
+    else:
+        logger.info(f"📁 Пробуем загрузить ключ из файла: {key_path}")
+        with open(key_path, 'r', encoding='utf-8') as f:
+            self.key_data = json.load(f)
+    
+    self.service_account_id = self.key_data['service_account_id']
+    self.private_key = self.key_data['private_key']
+    self.key_id = self.key_data['id']
+>>>>>>> f91aa786a5f9ee66a99e1016e012b1598af986ea
     
     def get_iam_token(self):
         now = time.time()
