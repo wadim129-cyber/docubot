@@ -1,4 +1,3 @@
-# backend/main_simple.py
 import sys
 import os
 import json
@@ -13,10 +12,11 @@ from typing import List, Optional, Dict
 from enum import Enum
 from functools import lru_cache
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
+from sqlalchemy.orm import Session
 
 # Загружаем .env
 load_dotenv()
@@ -24,6 +24,11 @@ load_dotenv()
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ==================== БАЗА ДАННЫХ ====================
+
+from database import get_db, AnalysisHistory, init_db
+from sqlalchemy import desc
 
 # ==================== КЭШИРОВАНИЕ ====================
 
@@ -78,20 +83,23 @@ class DocumentUploadResponse(BaseModel):
 # ==================== YANDEX GPT SERVICE ====================
 
 class YandexGPTService:
-    def __init__(self, folder_id: str, key_path: str):
+    def __init__(self, folder_id: str, key_path: str = None):
         self.folder_id = folder_id
         self.iam_token = None
         self.token_expires_at = 0
         
-        # 🔑 Читаем ключ из переменной окружения ИЛИ из файла
+        # 🔑 Читаем ключ из переменной окружения (приоритет)
         key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
         if key_content:
             self.key_data = json.loads(key_content)
             logger.info("✅ Ключ загружен из переменной окружения")
-        else:
-            logger.info(f"📁 Пробуем загрузить ключ из файла: {key_path}")
+        elif key_path and os.path.exists(key_path):
+            # Фолбэк: файл (для локальной разработки)
             with open(key_path, 'r', encoding='utf-8') as f:
                 self.key_data = json.load(f)
+            logger.info(f"✅ Ключ загружен из файла")
+        else:
+            raise RuntimeError("❌ Не найден ключ Yandex GPT! Установите AUTHORIZED_KEY_CONTENT")
         
         self.service_account_id = self.key_data['service_account_id']
         self.private_key = self.key_data['private_key']
@@ -160,13 +168,12 @@ class DocumentAgent:
             from PyPDF2 import PdfReader
             reader = PdfReader(BytesIO(file_content))
             
-            # Берём только первые 10 страниц (экономия времени)
             text = ""
             for page in reader.pages[:10]:
                 extracted = page.extract_text()
                 if extracted:
                     text += extracted + "\n"
-                if len(text) > 5000:  # Ограничиваем объём
+                if len(text) > 5000:
                     break
             
             return text.strip()
@@ -175,13 +182,11 @@ class DocumentAgent:
             return "[Ошибка чтения PDF]"
     
     def analyze_document(self, text: str) -> AnalysisResult:
-        # 🔍 Проверяем кэш
         text_hash = get_text_hash(text)
         if text_hash in _analysis_cache:
             logger.info("✅ Результат взят из кэша")
             return _analysis_cache[text_hash]
         
-        # 🔥 ОДИН запрос вместо четырёх!
         combined_prompt = f"""
 Ты — эксперт по анализу юридических документов. Проанализируй текст и верни ТОЛЬКО валидный JSON:
 
@@ -217,7 +222,6 @@ class DocumentAgent:
         
         response = self.gpt.call_gpt(combined_prompt, max_tokens=1200)
         
-        # Парсим JSON
         try:
             start = response.find('{')
             end = response.rfind('}') + 1
@@ -240,7 +244,6 @@ class DocumentAgent:
                 "confidence_score": 0.3
             }
         
-        # Конвертируем в Pydantic модели
         ext = data.get("extracted_data", {})
         result = AnalysisResult(
             extracted_data=ExtractedData(
@@ -265,7 +268,6 @@ class DocumentAgent:
             confidence_score=min(1.0, max(0.0, data.get("confidence_score", 0.5)))
         )
         
-        # 💾 Сохраняем в кэш
         _analysis_cache[text_hash] = result
         logger.info(f"💾 Результат сохранён в кэш (всего: {len(_analysis_cache)})")
         
@@ -283,10 +285,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Инициализация сервисов
+# Инициализация базы данных и сервисов
+init_db()
+logger.info("✅ Database initialized")
+
 FOLDER_ID = os.getenv("YANDEX_FOLDER_ID", "b1gdcuaq0il54iojm93b")
-KEY_PATH = os.path.join(os.path.dirname(__file__), "../authorized_key.json")
-gpt_service = YandexGPTService(FOLDER_ID, KEY_PATH)
+gpt_service = YandexGPTService(FOLDER_ID)  # KEY_PATH больше не нужен!
 agent = DocumentAgent(gpt_service)
 
 @app.get("/")
@@ -299,27 +303,75 @@ async def health_check():
 
 @app.get("/cache/stats")
 async def cache_stats():
-    """Статистика кэша для отладки"""
     return {
         "cache_size": len(_analysis_cache),
         "cache_info": get_text_hash.cache_info()
     }
 
 @app.post("/api/analyze", response_model=DocumentUploadResponse)
-async def analyze_document(file: UploadFile = File(...)):
+async def analyze_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
     logger.info(f"Получен файл: {file.filename}")
     try:
         content = await file.read()
         text = agent.extract_text_from_pdf(content)
         if not text or len(text) < 10:
             raise HTTPException(400, "Не удалось извлечь текст")
+        
         result = agent.analyze_document(text)
+        
+        # 💾 Сохраняем в историю
+        try:
+            history = AnalysisHistory(
+                filename=file.filename,
+                document_type=result.extracted_data.document_type.value,
+                parties=str(result.extracted_data.parties),
+                total_amount=result.extracted_data.total_amount,
+                currency=result.extracted_data.currency,
+                summary=result.summary,
+                confidence_score=result.confidence_score,
+                risk_count=len(result.risk_flags),
+                full_result=result.dict(),
+                user_id="web"
+            )
+            db.add(history)
+            db.commit()
+        except Exception as e:
+            logger.error(f"❌ Ошибка сохранения в БД: {e}")
+            db.rollback()
+        
         return DocumentUploadResponse(status="success", result=result)
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Ошибка: {str(e)}")
         return DocumentUploadResponse(status="error", error=str(e))
+
+@app.get("/api/history")
+async def get_history(limit: int = 10, skip: int = 0, db: Session = Depends(get_db)):
+    """Получить историю анализов"""
+    try:
+        analyses = db.query(AnalysisHistory).order_by(
+            desc(AnalysisHistory.created_at)
+        ).offset(skip).limit(limit).all()
+        
+        return {
+            "status": "success",
+            "count": len(analyses),
+            "analyses": [
+                {
+                    "id": a.id,
+                    "filename": a.filename,
+                    "document_type": a.document_type,
+                    "created_at": a.created_at.isoformat(),
+                    "confidence_score": a.confidence_score,
+                    "risk_count": a.risk_count
+                }
+                for a in analyses
+            ]
+        }
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}")
+        return {"status": "error", "error": str(e)}
 
 if __name__ == "__main__":
     import uvicorn
