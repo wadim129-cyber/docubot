@@ -57,6 +57,41 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Команда /stats - показать статистику"""
+    try:
+        response = requests.get(
+            f"{API_URL}/api/stats",
+            timeout=10
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            if data.get('status') == 'success':
+                stats = data
+                
+                message = f"""📊 <b>Статистика DocuBot AI</b>
+
+📁 <b>Всего документов:</b> {stats['total_documents']}
+
+📋 <b>По типам:</b>
+• Договоры: {stats['by_type']['contract']}
+• Счета: {stats['by_type']['invoice']}
+• Акты: {stats['by_type']['act']}
+• Другие: {stats['by_type']['other']}
+
+🎯 <b>Средняя уверенность:</b> {stats['avg_confidence']*100:.1f}%
+
+⚠️ <b>Всего рисков найдено:</b> {stats['total_risks']}
+"""
+                await update.message.reply_html(message)
+            else:
+                await update.message.reply_text("❌ Ошибка получения статистики")
+        else:
+            await update.message.reply_text("❌ Ошибка подключения к серверу")
+    
+    except Exception as e:
+        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
     """Команда /stats"""
     await update.message.reply_text(
         f"📊 Статистика DocuBot AI\n\n"
@@ -200,6 +235,7 @@ def main():
     # Добавляем обработчики
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(MessageHandler(filters.Document.PDF, handle_document))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
