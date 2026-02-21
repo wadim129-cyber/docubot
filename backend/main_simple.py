@@ -17,7 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-
+from sqlalchemy import func
 # Загружаем .env
 load_dotenv()
 
@@ -371,6 +371,52 @@ async def get_history(limit: int = 10, skip: int = 0, db: Session = Depends(get_
         }
     except Exception as e:
         logger.error(f"Error fetching history: {e}")
+        return {"status": "error", "error": str(e)}
+
+@app.get("/api/stats")
+async def get_stats(db: Session = Depends(get_db)):
+    """Получить общую статистику"""
+    try:
+        # Всего документов
+        total_documents = db.query(AnalysisHistory).count()
+        
+        # Документы по типам
+        contracts = db.query(AnalysisHistory).filter(
+            AnalysisHistory.document_type == "contract"
+        ).count()
+        
+        invoices = db.query(AnalysisHistory).filter(
+            AnalysisHistory.document_type == "invoice"
+        ).count()
+        
+        acts = db.query(AnalysisHistory).filter(
+            AnalysisHistory.document_type == "act"
+        ).count()
+        
+        # Средняя уверенность
+        avg_confidence = db.query(
+            sqlalchemy.func.avg(AnalysisHistory.confidence_score)
+        ).scalar() or 0
+        
+        # Всего рисков
+        total_risks = db.query(
+            sqlalchemy.func.sum(AnalysisHistory.risk_count)
+        ).scalar() or 0
+        
+        return {
+            "status": "success",
+            "total_documents": total_documents,
+            "by_type": {
+                "contract": contracts,
+                "invoice": invoices,
+                "act": acts,
+                "other": total_documents - contracts - invoices - acts
+            },
+            "avg_confidence": round(avg_confidence, 2),
+            "total_risks": total_risks
+        }
+    except Exception as e:
+        logger.error(f"Error fetching stats: {e}")
         return {"status": "error", "error": str(e)}
 
 if __name__ == "__main__":
