@@ -395,12 +395,12 @@ async def get_stats(db: Session = Depends(get_db)):
         
         # Средняя уверенность
         avg_confidence = db.query(
-            sqlalchemy.func.avg(AnalysisHistory.confidence_score)
+          func.avg(AnalysisHistory.confidence_score)
         ).scalar() or 0
         
         # Всего рисков
         total_risks = db.query(
-            sqlalchemy.func.sum(AnalysisHistory.risk_count)
+            func.sum(AnalysisHistory.risk_count)
         ).scalar() or 0
         
         return {
