@@ -79,12 +79,72 @@ export default function Home() {
           <div className="results">
             <h2>📊 Результаты анализа</h2>
             
-            <div className="result-card">
-              <h3>📋 Основная информация</h3>
-              <p><strong>Тип документа:</strong> {result.result.extracted_data.document_type}</p>
-              <p><strong>Стороны:</strong> {result.result.extracted_data.parties?.join(', ') || '—'}</p>
-              <p><strong>Сумма:</strong> {result.result.extracted_data.total_amount || 'Не указана'} {result.result.extracted_data.currency || ''}</p>
-            </div>
+            {/* ===== ОСНОВНАЯ ИНФОРМАЦИЯ ===== */}
+<div className="result-card">
+  <h3>📋 Основная информация</h3>
+  <p><strong>Тип:</strong> {result.result.extracted_data.document_type}</p>
+  <p><strong>Подтип:</strong> {result.result.extracted_data.document_subtype || '—'}</p>
+  <p><strong>Стороны:</strong> {result.result.extracted_data.parties?.join(', ') || '—'}</p>
+  <p><strong>Сумма:</strong> {result.result.extracted_data.total_amount ? `${result.result.extracted_data.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.currency || 'RUB'}` : 'Не указана'}</p>
+  
+  {/* Даты */}
+  {result.result.extracted_data.dates && Object.values(result.result.extracted_data.dates).some(v => v) && (
+    <details className="details-block">
+      <summary>📅 Даты</summary>
+      <div className="details-content">
+        {result.result.extracted_data.dates.signature && <p>Подписан: {result.result.extracted_data.dates.signature}</p>}
+        {result.result.extracted_data.dates.start_date && <p>Начало: {result.result.extracted_data.dates.start_date}</p>}
+        {result.result.extracted_data.dates.end_date && <p>Окончание: {result.result.extracted_data.dates.end_date}</p>}
+        {result.result.extracted_data.dates.payment_due && <p>Оплата до: {result.result.extracted_data.dates.payment_due}</p>}
+      </div>
+    </details>
+  )}
+</div>
+
+{/* ===== ФИНАНСОВЫЕ УСЛОВИЯ (для займов/кредитов) ===== */}
+{result.result.extracted_data.financial_terms && Object.values(result.result.extracted_data.financial_terms).some(v => v) && (
+  <div className="result-card">
+    <h3>💰 Финансовые условия</h3>
+    {result.result.extracted_data.financial_terms.interest_rate && (
+      <p className={result.result.extracted_data.financial_terms.interest_rate.includes('292%') ? 'warning-text' : ''}>
+        <strong>Процентная ставка:</strong> {result.result.extracted_data.financial_terms.interest_rate}
+      </p>
+    )}
+    {result.result.extracted_data.financial_terms.loan_term && <p><strong>Срок:</strong> {result.result.extracted_data.financial_terms.loan_term}</p>}
+    {result.result.extracted_data.financial_terms.monthly_payment && <p><strong>Ежемесячный платёж:</strong> {result.result.extracted_data.financial_terms.monthly_payment.toLocaleString('ru-RU')} ₽</p>}
+    {result.result.extracted_data.financial_terms.penalties && <p><strong>Штрафы:</strong> {result.result.extracted_data.financial_terms.penalties}</p>}
+    {result.result.extracted_data.financial_terms.payment_schedule && <p><strong>График:</strong> {result.result.extracted_data.financial_terms.payment_schedule}</p>}
+  </div>
+)}
+
+{/* ===== УСЛОВИЯ АРЕНДЫ ===== */}
+{result.result.extracted_data.rental_terms && Object.values(result.result.extracted_data.rental_terms).some(v => v) && (
+  <div className="result-card">
+    <h3>🏠 Условия аренды</h3>
+    {result.result.extracted_data.rental_terms.monthly_rent && <p><strong>Аренда:</strong> {result.result.extracted_data.rental_terms.monthly_rent.toLocaleString('ru-RU')} ₽/мес</p>}
+    {result.result.extracted_data.rental_terms.deposit && <p><strong>Залог:</strong> {result.result.extracted_data.rental_terms.deposit.toLocaleString('ru-RU')} ₽</p>}
+    {result.result.extracted_data.rental_terms.utilities && <p><strong>Коммуналка:</strong> {result.result.extracted_data.rental_terms.utilities}</p>}
+    {result.result.extracted_data.rental_terms.lease_duration && <p><strong>Срок:</strong> {result.result.extracted_data.rental_terms.lease_duration}</p>}
+  </div>
+)}
+
+{/* ===== ДАННЫЕ ЗАЯВИТЕЛЯ (для заявок на займ) ===== */}
+{result.result.extracted_data.applicant_info && Object.values(result.result.extracted_data.applicant_info).some(v => v) && (
+  <details className="result-card details-block">
+    <summary>👤 Данные заявителя</summary>
+    <div className="details-content">
+      {result.result.extracted_data.applicant_info.full_name && <p><strong>ФИО:</strong> {result.result.extracted_data.applicant_info.full_name}</p>}
+      {result.result.extracted_data.applicant_info.birth_date && <p><strong>Дата рождения:</strong> {result.result.extracted_data.applicant_info.birth_date}</p>}
+      {result.result.extracted_data.applicant_info.passport && <p><strong>Паспорт:</strong> {result.result.extracted_data.applicant_info.passport}</p>}
+      {result.result.extracted_data.applicant_info.inn && <p><strong>ИНН:</strong> {result.result.extracted_data.applicant_info.inn}</p>}
+      {result.result.extracted_data.applicant_info.snils && <p><strong>СНИЛС:</strong> {result.result.extracted_data.applicant_info.snils}</p>}
+      {result.result.extracted_data.applicant_info.phone && <p><strong>Телефон:</strong> {result.result.extracted_data.applicant_info.phone}</p>}
+      {result.result.extracted_data.applicant_info.email && <p><strong>Email:</strong> {result.result.extracted_data.applicant_info.email}</p>}
+      {result.result.extracted_data.applicant_info.monthly_income && <p><strong>Доход:</strong> {result.result.extracted_data.applicant_info.monthly_income.toLocaleString('ru-RU')} ₽/мес</p>}
+      {result.result.extracted_data.applicant_info.employment && <p><strong>Работа:</strong> {result.result.extracted_data.applicant_info.employment}</p>}
+    </div>
+  </details>
+)}
 
             <div className="result-card">
               <h3>⚠️ Риски ({result.result.risk_flags?.length || 0})</h3>
@@ -438,6 +498,46 @@ export default function Home() {
           .steps { flex-direction: column; align-items: center; }
           .benefits-grid { grid-template-columns: 1fr; }
           .App-header h1 { font-size: 2em; }
+        }
+              /* ===== DETAILS BLOCK ===== */
+        .details-block {
+          background: rgba(255, 255, 255, 0.03);
+          border-radius: 10px;
+          margin: 10px 0;
+        }
+        .details-block summary {
+          padding: 12px 20px;
+          cursor: pointer;
+          font-weight: 500;
+          list-style: none;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .details-block summary::-webkit-details-marker { display: none; }
+        .details-block summary::after {
+          content: '▼';
+          margin-left: auto;
+          font-size: 0.8em;
+          transition: transform 0.2s;
+        }
+        .details-block[open] summary::after { transform: rotate(180deg); }
+        .details-content {
+          padding: 0 20px 20px;
+          color: #ccc;
+        }
+        .details-content p { margin: 8px 0; }
+        
+        /* ===== WARNING TEXT ===== */
+        .warning-text {
+          color: #ffa500;
+          font-weight: 500;
+        }
+        
+        /* ===== АДАПТИВНОСТЬ ===== */
+        @media (max-width: 600px) {
+          .result-card { padding: 20px; }
+          .result-card h3 { font-size: 1.2em; }
         }
       `}</style>
     </div>
