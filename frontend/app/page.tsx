@@ -113,6 +113,87 @@ export default function Home() {
             </div>
           </div>
         )}
+              {/* ===== СЕКЦИЯ: КАК ЭТО РАБОТАЕТ ===== */}
+        <section className="how-it-works">
+          <h2>📋 Как это работает?</h2>
+          <div className="steps">
+            <div className="step">
+              <div className="step-number">1</div>
+              <h3>📄 Загрузите документ</h3>
+              <p>Выберите PDF файл: договор, счёт, акт или другой юридический документ</p>
+            </div>
+            <div className="step">
+              <div className="step-number">2</div>
+              <h3>🤖 AI анализирует</h3>
+              <p>Нейросеть читает документ, извлекает данные и ищет риски</p>
+            </div>
+            <div className="step">
+              <div className="step-number">3</div>
+              <h3>📊 Получите результат</h3>
+              <p>Увидите краткое резюме, риски и рекомендации на человеческом языке</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ===== СЕКЦИЯ: ПРЕИМУЩЕСТВА ===== */}
+        <section className="benefits">
+          <h2>⭐ Почему DocuBot?</h2>
+          <div className="benefits-grid">
+            <div className="benefit-card">
+              <span className="benefit-icon">⚡</span>
+              <h3>Быстро</h3>
+              <p>Анализ за 5-10 секунд вместо 30 минут чтения</p>
+            </div>
+            <div className="benefit-card">
+              <span className="benefit-icon">💰</span>
+              <h3>Дёшево</h3>
+              <p>Бесплатно для старта, дешевле чем консультация юриста</p>
+            </div>
+            <div className="benefit-card">
+              <span className="benefit-icon">🔒</span>
+              <h3>Конфиденциально</h3>
+              <p>Ваши документы не передаются третьим лицам</p>
+            </div>
+            <div className="benefit-card">
+              <span className="benefit-icon">🌙</span>
+              <h3>24/7</h3>
+              <p>Работает круглосуточно, без выходных и праздников</p>
+            </div>
+          </div>
+        </section>
+
+        {/* ===== СЕКЦИЯ: FAQ ===== */}
+        <section className="faq">
+          <h2>❓ Часто задаваемые вопросы</h2>
+          <div className="faq-list">
+            <details className="faq-item">
+              <summary>📁 Какие форматы документов поддерживаете?</summary>
+              <p>Сейчас поддерживаем только <strong>PDF</strong>. В планах: DOCX, изображения, сканы.</p>
+            </details>
+            <details className="faq-item">
+              <summary>🎯 Насколько точен анализ?</summary>
+              <p>Точность ~70-90% в зависимости от качества документа. Это <strong>помощник для первичного анализа</strong>, а не замена юриста.</p>
+            </details>
+            <details className="faq-item">
+              <summary>⚖️ Это заменяет юриста?</summary>
+              <p><strong>Нет.</strong> DocuBot помогает быстро оценить документ и найти "красные флаги". Для важных сделок всегда консультируйтесь с профессионалом.</p>
+            </details>
+            <details className="faq-item">
+              <summary>🔐 Куда попадают мои документы?</summary>
+              <p>Документы обрабатываются через Yandex Cloud API и не сохраняются на наших серверах. Мы не используем ваши данные для обучения моделей.</p>
+            </details>
+          </div>
+        </section>
+
+        {/* ===== FOOTER ===== */}
+        <footer className="footer">
+          <div className="footer-links">
+            <a href="/history" className="footer-link">📊 История анализов</a>
+            <a href="https://t.me/DocuBotAI_bot" target="_blank" rel="noopener noreferrer" className="footer-link">🤖 Telegram бот</a>
+            <a href="#" className="footer-link">📧 Контакты</a>
+          </div>
+          <p className="footer-text">© 2026 DocuBot AI • Не является юридической консультацией</p>
+        </footer>
       </main>
 
       <style jsx global>{`
@@ -218,6 +299,146 @@ export default function Home() {
         .risk-flag em { display: block; margin-top: 10px; color: #00d9ff; font-style: normal; }
         .result-card ul { padding-left: 20px; }
         .result-card li { margin: 10px 0; color: #ccc; }
+              /* ===== HOW IT WORKS ===== */
+        .how-it-works {
+          padding: 40px 20px;
+          text-align: center;
+        }
+        .how-it-works h2 {
+          color: #00d9ff;
+          margin-bottom: 30px;
+          font-size: 1.8em;
+        }
+        .steps {
+          display: flex;
+          gap: 20px;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+        .step {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 25px;
+          border-radius: 15px;
+          max-width: 250px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .step-number {
+          width: 50px;
+          height: 50px;
+          background: linear-gradient(90deg, #00d9ff, #00ff88);
+          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          font-size: 1.5em;
+          color: #1a1a2e;
+          margin: 0 auto 15px;
+        }
+        .step h3 { margin: 10px 0; color: #fff; }
+        .step p { color: #888; font-size: 0.95em; margin: 0; }
+
+        /* ===== BENEFITS ===== */
+        .benefits {
+          padding: 40px 20px;
+          text-align: center;
+        }
+        .benefits h2 {
+          color: #00d9ff;
+          margin-bottom: 30px;
+          font-size: 1.8em;
+        }
+        .benefits-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+          gap: 20px;
+          max-width: 900px;
+          margin: 0 auto;
+        }
+        .benefit-card {
+          background: rgba(255, 255, 255, 0.05);
+          padding: 25px;
+          border-radius: 15px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          transition: transform 0.2s;
+        }
+        .benefit-card:hover { transform: translateY(-5px); }
+        .benefit-icon { font-size: 2em; display: block; margin-bottom: 10px; }
+        .benefit-card h3 { margin: 10px 0; color: #fff; }
+        .benefit-card p { color: #888; font-size: 0.95em; margin: 0; }
+
+        /* ===== FAQ ===== */
+        .faq {
+          padding: 40px 20px;
+          max-width: 700px;
+          margin: 0 auto;
+        }
+        .faq h2 {
+          color: #00d9ff;
+          text-align: center;
+          margin-bottom: 30px;
+          font-size: 1.8em;
+        }
+        .faq-list { display: flex; flex-direction: column; gap: 15px; }
+        .faq-item {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 10px;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+          overflow: hidden;
+        }
+        .faq-item summary {
+          padding: 15px 20px;
+          cursor: pointer;
+          font-weight: 500;
+          list-style: none;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .faq-item summary::-webkit-details-marker { display: none; }
+        .faq-item summary::after {
+          content: '▼';
+          margin-left: auto;
+          font-size: 0.8em;
+          transition: transform 0.2s;
+        }
+        .faq-item[open] summary::after { transform: rotate(180deg); }
+        .faq-item p {
+          padding: 0 20px 20px;
+          color: #888;
+          margin: 0;
+          line-height: 1.5;
+        }
+        .faq-item p strong { color: #fff; }
+
+        /* ===== FOOTER ===== */
+        .footer {
+          padding: 40px 20px;
+          text-align: center;
+          border-top: 1px solid rgba(255, 255, 255, 0.1);
+          margin-top: 40px;
+        }
+        .footer-links {
+          display: flex;
+          gap: 20px;
+          justify-content: center;
+          flex-wrap: wrap;
+          margin-bottom: 20px;
+        }
+        .footer-link {
+          color: #00d9ff;
+          text-decoration: none;
+          transition: color 0.2s;
+        }
+        .footer-link:hover { color: #00ff88; }
+        .footer-text { color: #666; font-size: 0.9em; margin: 0; }
+
+        /* ===== АДАПТИВНОСТЬ ===== */
+        @media (max-width: 768px) {
+          .steps { flex-direction: column; align-items: center; }
+          .benefits-grid { grid-template-columns: 1fr; }
+          .App-header h1 { font-size: 2em; }
+        }
       `}</style>
     </div>
   );
