@@ -43,10 +43,11 @@ _analysis_cache: Dict[str, 'AnalysisResult'] = {}
 # ==================== МОДЕЛИ ====================
 
 class DocumentType(str, Enum):
-    CONTRACT = "contract"
-    INVOICE = "invoice"
-    ACT = "act"
-    OTHER = "other"
+    contract = "contract"
+    invoice = "invoice"
+    act = "act"
+    application = "application"  # ← Добавили!
+    other = "other"
 
 class RiskLevel(str, Enum):
     LOW = "low"
