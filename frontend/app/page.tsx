@@ -80,72 +80,75 @@ export default function Home() {
             <h2>📊 Результаты анализа</h2>
             
             {/* ===== ОСНОВНАЯ ИНФОРМАЦИЯ ===== */}
-<div className="result-card">
-  <h3>📋 Основная информация</h3>
-  <p><strong>Тип:</strong> {result.result.extracted_data.document_type}</p>
-  <p><strong>Подтип:</strong> {result.result.extracted_data.document_subtype || '—'}</p>
-  <p><strong>Стороны:</strong> {result.result.extracted_data.parties?.join(', ') || '—'}</p>
-  <p><strong>Сумма:</strong> {result.result.extracted_data.total_amount ? `${result.result.extracted_data.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.currency || 'RUB'}` : 'Не указана'}</p>
-  
-  {/* Даты */}
-  {result.result.extracted_data.dates && Object.values(result.result.extracted_data.dates).some(v => v) && (
-    <details className="details-block">
-      <summary>📅 Даты</summary>
-      <div className="details-content">
-        {result.result.extracted_data.dates.signature && <p>Подписан: {result.result.extracted_data.dates.signature}</p>}
-        {result.result.extracted_data.dates.start_date && <p>Начало: {result.result.extracted_data.dates.start_date}</p>}
-        {result.result.extracted_data.dates.end_date && <p>Окончание: {result.result.extracted_data.dates.end_date}</p>}
-        {result.result.extracted_data.dates.payment_due && <p>Оплата до: {result.result.extracted_data.dates.payment_due}</p>}
-      </div>
-    </details>
-  )}
-</div>
+            <div className="result-card">
+              <h3>📋 Основная информация</h3>
+              <p><strong>Тип:</strong> {result.result.extracted_data.document_type}</p>
+              <p><strong>Подтип:</strong> {result.result.extracted_data.document_subtype || '—'}</p>
+              <p><strong>Стороны:</strong> {result.result.extracted_data.parties?.join(', ') || '—'}</p>
+              <p><strong>Сумма:</strong> {result.result.extracted_data.total_amount ? `${result.result.extracted_data.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.currency || 'RUB'}` : 'Не указана'}</p>
+              
+              {/* Даты - раскрывающийся блок */}
+              {result.result.extracted_data.dates && Object.values(result.result.extracted_data.dates).some(v => v) && (
+                <details className="details-block">
+                  <summary>📅 Даты</summary>
+                  <div className="details-content">
+                    {result.result.extracted_data.dates.signature && <p><strong>Подписан:</strong> {result.result.extracted_data.dates.signature}</p>}
+                    {result.result.extracted_data.dates.start_date && <p><strong>Начало:</strong> {result.result.extracted_data.dates.start_date}</p>}
+                    {result.result.extracted_data.dates.end_date && <p><strong>Окончание:</strong> {result.result.extracted_data.dates.end_date}</p>}
+                    {result.result.extracted_data.dates.payment_due && <p><strong>Оплата до:</strong> {result.result.extracted_data.dates.payment_due}</p>}
+                  </div>
+                </details>
+              )}
+            </div>
 
-{/* ===== ФИНАНСОВЫЕ УСЛОВИЯ (для займов/кредитов) ===== */}
-{result.result.extracted_data.financial_terms && Object.values(result.result.extracted_data.financial_terms).some(v => v) && (
-  <div className="result-card">
-    <h3>💰 Финансовые условия</h3>
-    {result.result.extracted_data.financial_terms.interest_rate && (
-      <p className={result.result.extracted_data.financial_terms.interest_rate.includes('292%') ? 'warning-text' : ''}>
-        <strong>Процентная ставка:</strong> {result.result.extracted_data.financial_terms.interest_rate}
-      </p>
-    )}
-    {result.result.extracted_data.financial_terms.loan_term && <p><strong>Срок:</strong> {result.result.extracted_data.financial_terms.loan_term}</p>}
-    {result.result.extracted_data.financial_terms.monthly_payment && <p><strong>Ежемесячный платёж:</strong> {result.result.extracted_data.financial_terms.monthly_payment.toLocaleString('ru-RU')} ₽</p>}
-    {result.result.extracted_data.financial_terms.penalties && <p><strong>Штрафы:</strong> {result.result.extracted_data.financial_terms.penalties}</p>}
-    {result.result.extracted_data.financial_terms.payment_schedule && <p><strong>График:</strong> {result.result.extracted_data.financial_terms.payment_schedule}</p>}
-  </div>
-)}
+            {/* ===== ФИНАНСОВЫЕ УСЛОВИЯ ===== */}
+            {result.result.extracted_data.financial_terms && Object.values(result.result.extracted_data.financial_terms).some(v => v) && (
+              <div className="result-card">
+                <h3>💰 Финансовые условия</h3>
+                {result.result.extracted_data.financial_terms.interest_rate && (
+                  <p className={result.result.extracted_data.financial_terms.interest_rate.includes('292%') ? 'warning-text' : ''}>
+                    <strong>Процентная ставка:</strong> {result.result.extracted_data.financial_terms.interest_rate}
+                  </p>
+                )}
+                {result.result.extracted_data.financial_terms.loan_term && <p><strong>Срок:</strong> {result.result.extracted_data.financial_terms.loan_term}</p>}
+                {result.result.extracted_data.financial_terms.monthly_payment && <p><strong>Ежемесячный платёж:</strong> {result.result.extracted_data.financial_terms.monthly_payment.toLocaleString('ru-RU')} ₽</p>}
+                {result.result.extracted_data.financial_terms.penalties && <p><strong>Штрафы:</strong> {result.result.extracted_data.financial_terms.penalties}</p>}
+                {result.result.extracted_data.financial_terms.payment_schedule && <p><strong>График:</strong> {result.result.extracted_data.financial_terms.payment_schedule}</p>}
+              </div>
+            )}
 
-{/* ===== УСЛОВИЯ АРЕНДЫ ===== */}
-{result.result.extracted_data.rental_terms && Object.values(result.result.extracted_data.rental_terms).some(v => v) && (
-  <div className="result-card">
-    <h3>🏠 Условия аренды</h3>
-    {result.result.extracted_data.rental_terms.monthly_rent && <p><strong>Аренда:</strong> {result.result.extracted_data.rental_terms.monthly_rent.toLocaleString('ru-RU')} ₽/мес</p>}
-    {result.result.extracted_data.rental_terms.deposit && <p><strong>Залог:</strong> {result.result.extracted_data.rental_terms.deposit.toLocaleString('ru-RU')} ₽</p>}
-    {result.result.extracted_data.rental_terms.utilities && <p><strong>Коммуналка:</strong> {result.result.extracted_data.rental_terms.utilities}</p>}
-    {result.result.extracted_data.rental_terms.lease_duration && <p><strong>Срок:</strong> {result.result.extracted_data.rental_terms.lease_duration}</p>}
-  </div>
-)}
+            {/* ===== УСЛОВИЯ АРЕНДЫ ===== */}
+            {result.result.extracted_data.rental_terms && Object.values(result.result.extracted_data.rental_terms).some(v => v) && (
+              <div className="result-card">
+                <h3>🏠 Условия аренды</h3>
+                {result.result.extracted_data.rental_terms.monthly_rent && <p><strong>Аренда:</strong> {result.result.extracted_data.rental_terms.monthly_rent.toLocaleString('ru-RU')} ₽/мес</p>}
+                {result.result.extracted_data.rental_terms.deposit && <p><strong>Залог:</strong> {result.result.extracted_data.rental_terms.deposit.toLocaleString('ru-RU')} ₽</p>}
+                {result.result.extracted_data.rental_terms.utilities && <p><strong>Коммуналка:</strong> {result.result.extracted_data.rental_terms.utilities}</p>}
+                {result.result.extracted_data.rental_terms.lease_duration && <p><strong>Срок:</strong> {result.result.extracted_data.rental_terms.lease_duration}</p>}
+              </div>
+            )}
 
-{/* ===== ДАННЫЕ ЗАЯВИТЕЛЯ (для заявок на займ) ===== */}
-{result.result.extracted_data.applicant_info && Object.values(result.result.extracted_data.applicant_info).some(v => v) && (
-  <details className="result-card details-block">
-    <summary>👤 Данные заявителя</summary>
-    <div className="details-content">
-      {result.result.extracted_data.applicant_info.full_name && <p><strong>ФИО:</strong> {result.result.extracted_data.applicant_info.full_name}</p>}
-      {result.result.extracted_data.applicant_info.birth_date && <p><strong>Дата рождения:</strong> {result.result.extracted_data.applicant_info.birth_date}</p>}
-      {result.result.extracted_data.applicant_info.passport && <p><strong>Паспорт:</strong> {result.result.extracted_data.applicant_info.passport}</p>}
-      {result.result.extracted_data.applicant_info.inn && <p><strong>ИНН:</strong> {result.result.extracted_data.applicant_info.inn}</p>}
-      {result.result.extracted_data.applicant_info.snils && <p><strong>СНИЛС:</strong> {result.result.extracted_data.applicant_info.snils}</p>}
-      {result.result.extracted_data.applicant_info.phone && <p><strong>Телефон:</strong> {result.result.extracted_data.applicant_info.phone}</p>}
-      {result.result.extracted_data.applicant_info.email && <p><strong>Email:</strong> {result.result.extracted_data.applicant_info.email}</p>}
-      {result.result.extracted_data.applicant_info.monthly_income && <p><strong>Доход:</strong> {result.result.extracted_data.applicant_info.monthly_income.toLocaleString('ru-RU')} ₽/мес</p>}
-      {result.result.extracted_data.applicant_info.employment && <p><strong>Работа:</strong> {result.result.extracted_data.applicant_info.employment}</p>}
-    </div>
-  </details>
-)}
-
+            {/* ===== ДАННЫЕ ЗАЯВИТЕЛЯ ===== */}
+            {result.result.extracted_data.applicant_info && Object.values(result.result.extracted_data.applicant_info).some(v => v) && (
+              <details className="result-card details-block">
+                <summary>👤 Данные заявителя</summary>
+                <div className="details-content">
+                  {result.result.extracted_data.applicant_info.full_name && <p><strong>ФИО:</strong> {result.result.extracted_data.applicant_info.full_name}</p>}
+                  {result.result.extracted_data.applicant_info.birth_date && <p><strong>Дата рождения:</strong> {result.result.extracted_data.applicant_info.birth_date}</p>}
+                  {result.result.extracted_data.applicant_info.passport && <p><strong>Паспорт:</strong> {result.result.extracted_data.applicant_info.passport}</p>}
+                  {result.result.extracted_data.applicant_info.inn && <p><strong>ИНН:</strong> {result.result.extracted_data.applicant_info.inn}</p>}
+                  {result.result.extracted_data.applicant_info.snils && <p><strong>СНИЛС:</strong> {result.result.extracted_data.applicant_info.snils}</p>}
+                  {result.result.extracted_data.applicant_info.phone && <p><strong>Телефон:</strong> {result.result.extracted_data.applicant_info.phone}</p>}
+                  {result.result.extracted_data.applicant_info.email && <p><strong>Email:</strong> {result.result.extracted_data.applicant_info.email}</p>}
+                  {result.result.extracted_data.applicant_info.monthly_income && <p><strong>Доход:</strong> {result.result.extracted_data.applicant_info.monthly_income.toLocaleString('ru-RU')} ₽/мес</p>}
+                  {result.result.extracted_data.applicant_info.employment && <p><strong>Работа:</strong> {result.result.extracted_data.applicant_info.employment}</p>}
+                  {result.result.extracted_data.applicant_info.marital_status && <p><strong>Семейное положение:</strong> {result.result.extracted_data.applicant_info.marital_status}</p>}
+                  {result.result.extracted_data.applicant_info.children_count !== undefined && <p><strong>Дети:</strong> {result.result.extracted_data.applicant_info.children_count}</p>}
+                </div>
+              </details>
+            )}
+            
+            {/* ===== РИСКИ ===== */}
             <div className="result-card">
               <h3>⚠️ Риски ({result.result.risk_flags?.length || 0})</h3>
               {result.result.risk_flags?.map((flag: any, index: number) => (
@@ -157,6 +160,7 @@ export default function Home() {
               ))}
             </div>
 
+            {/* ===== РЕКОМЕНДАЦИИ ===== */}
             <div className="result-card">
               <h3>✅ Рекомендации</h3>
               <ul>
@@ -166,6 +170,7 @@ export default function Home() {
               </ul>
             </div>
 
+            {/* ===== РЕЗЮМЕ ===== */}
             <div className="result-card">
               <h3>📝 Резюме</h3>
               <p>{result.result.summary}</p>
@@ -173,7 +178,8 @@ export default function Home() {
             </div>
           </div>
         )}
-              {/* ===== СЕКЦИЯ: КАК ЭТО РАБОТАЕТ ===== */}
+
+        {/* ===== СЕКЦИЯ: КАК ЭТО РАБОТАЕТ ===== */}
         <section className="how-it-works">
           <h2>📋 Как это работает?</h2>
           <div className="steps">
@@ -359,7 +365,8 @@ export default function Home() {
         .risk-flag em { display: block; margin-top: 10px; color: #00d9ff; font-style: normal; }
         .result-card ul { padding-left: 20px; }
         .result-card li { margin: 10px 0; color: #ccc; }
-              /* ===== HOW IT WORKS ===== */
+        
+        /* ===== HOW IT WORKS ===== */
         .how-it-works {
           padding: 40px 20px;
           text-align: center;
@@ -493,17 +500,12 @@ export default function Home() {
         .footer-link:hover { color: #00ff88; }
         .footer-text { color: #666; font-size: 0.9em; margin: 0; }
 
-        /* ===== АДАПТИВНОСТЬ ===== */
-        @media (max-width: 768px) {
-          .steps { flex-direction: column; align-items: center; }
-          .benefits-grid { grid-template-columns: 1fr; }
-          .App-header h1 { font-size: 2em; }
-        }
-              /* ===== DETAILS BLOCK ===== */
+        /* ===== DETAILS BLOCK ===== */
         .details-block {
           background: rgba(255, 255, 255, 0.03);
           border-radius: 10px;
           margin: 10px 0;
+          border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .details-block summary {
           padding: 12px 20px;
@@ -513,6 +515,7 @@ export default function Home() {
           display: flex;
           align-items: center;
           gap: 8px;
+          color: #00d9ff;
         }
         .details-block summary::-webkit-details-marker { display: none; }
         .details-block summary::after {
@@ -535,6 +538,11 @@ export default function Home() {
         }
         
         /* ===== АДАПТИВНОСТЬ ===== */
+        @media (max-width: 768px) {
+          .steps { flex-direction: column; align-items: center; }
+          .benefits-grid { grid-template-columns: 1fr; }
+          .App-header h1 { font-size: 2em; }
+        }
         @media (max-width: 600px) {
           .result-card { padding: 20px; }
           .result-card h3 { font-size: 1.2em; }
