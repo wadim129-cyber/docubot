@@ -590,58 +590,45 @@ export default function Home() {
         }
                   /* ===== PRINT STYLES ===== */
         @media print {
-          body {
-            background: white !important;
-          }
-          .App-header,
-          .upload-section,
-          .how-it-works,
-          .benefits,
-          .faq,
-          .footer,
-          .export-section,
-          .upload-btn {
-            display: none !important;
-          }
-          .results {
-            display: block !important;
-            background: white !important;
-            color: black !important;
-            box-shadow: none !important;
-          }
-          .result-card {
-            background: white !important;
-            color: black !important;
-            border: 1px solid #ddd !important;
-            break-inside: avoid;
-          }
-          .result-card h3 {
-            color: #00d9ff !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .risk-flag {
-            break-inside: avoid;
-          }
-          .risk-high {
-            background: #ffebee !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .risk-medium {
-            background: #fff3e0 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          .risk-low {
-            background: #e8f5e9 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-          details {
-            break-inside: avoid;
-          }
-        }
+  body {
+    background: white !important;
+  }
+  .App-header,
+  .upload-section,
+  .how-it-works,
+  .benefits,
+  .faq,
+  .footer,
+  .export-section {
+    display: none !important;
+  }
+  .results {
+    display: block !important;
+    background: white !important;
+    color: black !important;
+  }
+  .result-card {
+    background: white !important;
+    color: black !important;
+    border: 1px solid #ddd !important;
+    break-inside: avoid;
+  }
+  .risk-high {
+    background: #ffebee !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .risk-medium {
+    background: #fff3e0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .risk-low {
+    background: #e8f5e9 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
       
       `}</style>
     </div>
