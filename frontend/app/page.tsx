@@ -58,20 +58,20 @@ export default function Home() {
       const html2pdf = (await import('html2pdf.js')).default;
       
       const opt = {
-        margin: [10, 10],
-        filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          logging: false 
-        },
-        jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'portrait' 
-        }
-      };
+  margin: [10, 10, 10, 10] as [number, number, number, number],  // ← 4 значения + типизация
+  filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
+  image: { type: 'jpeg' as const, quality: 0.98 },
+  html2canvas: { 
+    scale: 2, 
+    useCORS: true,
+    logging: false 
+  },
+  jsPDF: { 
+    unit: 'mm' as const, 
+    format: 'a4' as const, 
+    orientation: 'portrait' as const 
+  }
+};
       
       await html2pdf().set(opt).from(element).save();
       
