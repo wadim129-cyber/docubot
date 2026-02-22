@@ -47,60 +47,44 @@ export default function Home() {
   };
 
   const handleExportPDF = async () => {
-  const element = document.querySelector('.results') as HTMLElement;
-  if (!element) {
-    alert('Ошибка: не удалось найти результаты');
-    return;
-  }
-  
-  // Показываем индикатор загрузки
-  const btn = document.querySelector('.export-btn') as HTMLButtonElement;
-  const originalText = btn.innerHTML;
-  btn.innerHTML = '⏳ Генерация PDF...';
-  btn.disabled = true;
-  
-  try {
-    // Проверяем тип устройства
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    const btn = document.querySelector('.export-btn') as HTMLButtonElement;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Генерация PDF...';
+    btn.disabled = true;
     
-    if (isMobile) {
-      // Для мобильных устройств используем print
-      window.print();
-    } else {
-      // Для десктопа используем html2pdf
-      const html2pdf = (await import('html2pdf.js')).default;
+    try {
+      // Получаем последний анализ из истории
+      const historyResponse = await fetch(`${API_URL}/api/history?limit=1`);
+      const historyData = await historyResponse.json();
       
-      const opt = {
-        margin: [10, 10, 10, 10] as [number, number, number, number],
-        filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
-        image: { type: 'jpeg' as const, quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true,
-          logging: false,
-          scrollY: 0
-        },
-        jsPDF: { 
-          unit: 'mm' as const, 
-          format: 'a4' as const, 
-          orientation: 'portrait' as const 
-        }
-      };
-      
-      await html2pdf().set(opt).from(element).save();
+      if (historyData.analyses && historyData.analyses.length > 0) {
+        const latestAnalysisId = historyData.analyses[0].id;
+        
+        // Запрашиваем PDF с сервера
+        const response = await fetch(`${API_URL}/api/generate-pdf/${latestAnalysisId}`);
+        
+        if (!response.ok) throw new Error('Failed to generate PDF');
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `docubot-analysis-${Date.now()}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        throw new Error('No analysis found');
+      }
+    } catch (error) {
+      console.error('PDF error:', error);
+      alert('❌ Ошибка при создании PDF. Попробуйте ещё раз.');
+    } finally {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
     }
-    
-  } catch (error) {
-    console.error('PDF generation error:', error);
-    // Фолбэк: открываем печать
-    alert('📄 Откроется окно печати. Выберите "Сохранить как PDF"');
-    window.print();
-  } finally {
-    // Возвращаем кнопку
-    btn.innerHTML = originalText;
-    btn.disabled = false;
-  }
-};
+  };
 
   return (
     <div className="App">
@@ -510,15 +494,26 @@ export default function Home() {
         .export-btn:active {
           transform: translateY(0);
         }
+        
+        /* Мобильная оптимизация */
         @media (max-width: 768px) {
           .steps { flex-direction: column; align-items: center; }
           .benefits-grid { grid-template-columns: 1fr; }
           .App-header h1 { font-size: 2em; }
+          .export-btn {
+            width: 100%;
+            max-width: 300px;
+          }
+          .results { font-size: 14px; }
+          .result-card { padding: 15px; }
         }
+        
         @media (max-width: 600px) {
           .result-card { padding: 20px; }
           .result-card h3 { font-size: 1.2em; }
         }
+        
+        /* Печать — только если пользователь сам нажмёт Ctrl+P */
         @media print {
           .App-header,
           .upload-section,
@@ -546,52 +541,6 @@ export default function Home() {
           body {
             background: white !important;
           }
-            /* Мобильная оптимизация */
-@media (max-width: 768px) {
-  .export-btn {
-    width: 100%;
-    max-width: 300px;
-  }
-  
-  .results {
-    font-size: 14px;
-  }
-  
-  .result-card {
-    padding: 15px;
-  }
-}
-
-@media print and (max-width: 768px) {
-  .App-header,
-  .upload-section,
-  .how-it-works,
-  .benefits,
-  .faq,
-  .footer,
-  .export-section {
-    display: none !important;
-  }
-  
-  .results {
-    display: block !important;
-    background: white !important;
-    color: black !important;
-    padding: 10px;
-    font-size: 12px;
-  }
-  
-  .result-card {
-    background: white !important;
-    border: 1px solid #ddd !important;
-    margin-bottom: 15px;
-    page-break-inside: avoid;
-  }
-  
-  body {
-    background: white !important;
-  }
-
         }
       `}</style>
     </div>

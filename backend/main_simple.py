@@ -14,10 +14,17 @@ from functools import lru_cache
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+
+# Для генерации PDF
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+
 # Загружаем .env
 load_dotenv()
 
@@ -46,7 +53,7 @@ class DocumentType(str, Enum):
     contract = "contract"
     invoice = "invoice"
     act = "act"
-    application = "application"  # ← Добавили!
+    application = "application"
     other = "other"
 
 class RiskLevel(str, Enum):
@@ -89,13 +96,11 @@ class YandexGPTService:
         self.iam_token = None
         self.token_expires_at = 0
         
-        # 🔑 Читаем ключ из переменной окружения (приоритет)
         key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
         if key_content:
             self.key_data = json.loads(key_content)
             logger.info("✅ Ключ загружен из переменной окружения")
         elif key_path and os.path.exists(key_path):
-            # Фолбэк: файл (для локальной разработки)
             with open(key_path, 'r', encoding='utf-8') as f:
                 self.key_data = json.load(f)
             logger.info(f"✅ Ключ загружен из файла")
@@ -164,7 +169,6 @@ class DocumentAgent:
         self.gpt = gpt_service
     
     def extract_text_from_pdf(self, file_content: bytes) -> str:
-        """Быстрое извлечение текста с ограничением"""
         try:
             from PyPDF2 import PdfReader
             reader = PdfReader(BytesIO(file_content))
@@ -202,45 +206,10 @@ class DocumentAgent:
     "parties": ["Сторона 1", "Сторона 2"],
     "total_amount": 5800,
     "currency": "RUB",
-    "dates": {{
-      "signature": "2024-01-01",
-      "start_date": "2024-01-01",
-      "end_date": "2024-12-31",
-      "payment_due": "2024-01-15"
-    }},
-    "financial_terms": {{
-      "interest_rate": "0.8% в день (292% годовых)",
-      "loan_term": "30 дней",
-      "monthly_payment": 11000,
-      "penalties": "10% от суммы просрочки",
-      "payment_schedule": "единовременно"
-    }},
-    "rental_terms": {{
-      "monthly_rent": 50000,
-      "deposit": 50000,
-      "utilities": "арендатор платит отдельно",
-      "lease_duration": "11 месяцев"
-    }},
-    "applicant_info": {{
-      "full_name": "Иванов Иван Иванович",
-      "birth_date": "1990-01-01",
-      "passport": "1234 567890",
-      "inn": "123456789012",
-      "snils": "12345678901",
-      "phone": "+79991234567",
-      "email": "email@example.com",
-      "monthly_income": 80000,
-      "employment": "наемный сотрудник",
-      "marital_status": "разведен(а)",
-      "children_count": 1
-    }},
-    "items": ["товар/услуга 1", "товар/услуга 2"],
+    "dates": {{"signature": "2024-01-01"}},
+    "financial_terms": {{"interest_rate": "0.8% в день", "loan_term": "30 дней"}},
     "obligations": ["обязательство 1"],
-    "penalties": "описание штрафов",
-    "requisites": {{
-      "inn": "...",
-      "bank_account": "..."
-    }}
+    "penalties": "описание штрафов"
   }},
   "risk_flags": [
     {{"level": "high|medium|low", "category": "financial|legal|operational", "description": "...", "suggestion": "..."}}
@@ -251,26 +220,11 @@ class DocumentAgent:
 }}
 
 ⚠️ ПРАВИЛА:
-• parties — СПИСОК строк: ["ООО ВЭББАНКИР", "Иванов Иван Иванович"]
-• document_subtype определи точно:
-  - microloan_application = заявление на микрозайм (заполни applicant_info)
-  - loan = договор займа/кредита (заполни financial_terms)
-  - rental = аренда (заполни rental_terms)
-  - invoice = счёт (укажи items и payment_due)
-  - act = акт (укажи items)
-• ИЗВЛЕКАЙ ВСЁ что есть в тексте:
-  - Для заявлений: личные данные, паспорт, ИНН, СНИЛС, доход, контакты
-  - Для договоров: суммы, сроки, проценты, штрафы, условия
-  - Для счетов: товары, суммы, сроки оплаты
+• parties — СПИСОК строк
+• ИЗВЛЕКАЙ ВСЁ что есть в тексте
 • Если данных нет — ставь null
 • Верни ТОЛЬКО JSON, без markdown
 • confidence_score: 0.0-1.0
-
-🎯 ОСОБОЕ ВНИМАНИЕ:
-• Для микрозаймов: извлеки ВСЕ личные данные (ФИО, паспорт, ИНН, СНИЛС, телефон, email, доход)
-• Для аренды: сумма аренды, залог, срок, коммуналка, штрафы за выезд
-• Для кредитов: процентная ставка (в день и годовых), срок, ежемесячный платёж
-• ИЩИ риски: высокие проценты, скрытые комиссии, односторонние условия
 """
         
         response = self.gpt.call_gpt(combined_prompt, max_tokens=1200)
@@ -343,7 +297,7 @@ init_db()
 logger.info("✅ Database initialized")
 
 FOLDER_ID = os.getenv("YANDEX_FOLDER_ID", "b1gdcuaq0il54iojm93b")
-gpt_service = YandexGPTService(FOLDER_ID)  # KEY_PATH больше не нужен!
+gpt_service = YandexGPTService(FOLDER_ID)
 agent = DocumentAgent(gpt_service)
 
 @app.get("/")
@@ -372,7 +326,6 @@ async def analyze_document(file: UploadFile = File(...), db: Session = Depends(g
         
         result = agent.analyze_document(text)
         
-        # 💾 Сохраняем в историю
         try:
             history = AnalysisHistory(
                 filename=file.filename,
@@ -401,7 +354,6 @@ async def analyze_document(file: UploadFile = File(...), db: Session = Depends(g
 
 @app.get("/api/history")
 async def get_history(limit: int = 10, skip: int = 0, db: Session = Depends(get_db)):
-    """Получить историю анализов"""
     try:
         analyses = db.query(AnalysisHistory).order_by(
             desc(AnalysisHistory.created_at)
@@ -428,12 +380,9 @@ async def get_history(limit: int = 10, skip: int = 0, db: Session = Depends(get_
 
 @app.get("/api/stats")
 async def get_stats(db: Session = Depends(get_db)):
-    """Получить общую статистику"""
     try:
-        # Всего документов
         total_documents = db.query(AnalysisHistory).count()
         
-        # Документы по типам
         contracts = db.query(AnalysisHistory).filter(
             AnalysisHistory.document_type == "contract"
         ).count()
@@ -446,12 +395,10 @@ async def get_stats(db: Session = Depends(get_db)):
             AnalysisHistory.document_type == "act"
         ).count()
         
-        # Средняя уверенность
         avg_confidence = db.query(
           func.avg(AnalysisHistory.confidence_score)
         ).scalar() or 0
         
-        # Всего рисков
         total_risks = db.query(
             func.sum(AnalysisHistory.risk_count)
         ).scalar() or 0
@@ -471,6 +418,103 @@ async def get_stats(db: Session = Depends(get_db)):
     except Exception as e:
         logger.error(f"Error fetching stats: {e}")
         return {"status": "error", "error": str(e)}
+
+# ==================== PDF GENERATION ENDPOINT ====================
+
+@app.post("/api/generate-pdf/{analysis_id}")
+async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
+    """Генерация PDF отчёта"""
+    
+    analysis = db.query(AnalysisHistory).filter(
+        AnalysisHistory.id == analysis_id
+    ).first()
+    
+    if not analysis:
+        raise HTTPException(404, "Analysis not found")
+    
+    # Создаём PDF
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y_position = height - 50
+    
+    # Заголовок
+    p.setFont("Helvetica-Bold", 24)
+    p.drawString(100, y_position, "DocuBot AI - Analysis Report")
+    y_position -= 40
+    
+    # Основная информация
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y_position, "📋 Основная информация")
+    y_position -= 25
+    
+    p.setFont("Helvetica", 11)
+    full_result = analysis.full_result if isinstance(analysis.full_result, dict) else json.loads(analysis.full_result)
+    extracted_data = full_result.get('extracted_data', {})
+    
+    p.drawString(50, y_position, f"Тип документа: {extracted_data.get('document_type', 'N/A')}")
+    y_position -= 20
+    p.drawString(50, y_position, f"Стороны: {', '.join(extracted_data.get('parties', []))}")
+    y_position -= 20
+    p.drawString(50, y_position, f"Сумма: {extracted_data.get('total_amount', 'N/A')} {extracted_data.get('currency', '')}")
+    y_position -= 40
+    
+    # Риски
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y_position, f"⚠️ Риски ({len(full_result.get('risk_flags', []))})")
+    y_position -= 25
+    
+    for flag in full_result.get('risk_flags', []):
+        p.setFont("Helvetica", 10)
+        p.drawString(50, y_position, f"• {flag.get('level', '').upper()} - {flag.get('category', '')}: {flag.get('description', '')}")
+        y_position -= 15
+        if y_position < 100:
+            p.showPage()
+            y_position = height - 50
+    
+    # Рекомендации
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y_position, "✅ Рекомендации")
+    y_position -= 25
+    
+    for i, item in enumerate(full_result.get('action_items', []), 1):
+        p.setFont("Helvetica", 10)
+        p.drawString(50, y_position, f"{i}. {item}")
+        y_position -= 18
+        if y_position < 100:
+            p.showPage()
+            y_position = height - 50
+    
+    # Резюме
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(50, y_position, "📝 Резюме")
+    y_position -= 25
+    
+    p.setFont("Helvetica", 11)
+    summary_text = full_result.get('summary', '')
+    words = summary_text.split()
+    line = ""
+    for word in words:
+        if len(line) + len(word) < 80:
+            line += word + " "
+        else:
+            p.drawString(50, y_position, line)
+            y_position -= 18
+            line = word + " "
+            if y_position < 100:
+                p.showPage()
+                y_position = height - 50
+    if line:
+        p.drawString(50, y_position, line)
+    
+    p.save()
+    buffer.seek(0)
+    
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=docubot-analysis-{analysis_id}.pdf"}
+    )
 
 if __name__ == "__main__":
     import uvicorn
