@@ -47,39 +47,60 @@ export default function Home() {
   };
 
   const handleExportPDF = async () => {
-    const element = document.querySelector('.results') as HTMLElement;
-    if (!element) {
-      alert('Ошибка: не удалось найти результаты');
-      return;
-    }
+  const element = document.querySelector('.results') as HTMLElement;
+  if (!element) {
+    alert('Ошибка: не удалось найти результаты');
+    return;
+  }
+  
+  // Показываем индикатор загрузки
+  const btn = document.querySelector('.export-btn') as HTMLButtonElement;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ Генерация PDF...';
+  btn.disabled = true;
+  
+  try {
+    // Проверяем тип устройства
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
-    try {
-      // Динамический импорт html2pdf
+    if (isMobile) {
+      // Для мобильных устройств используем print
+      window.print();
+    } else {
+      // Для десктопа используем html2pdf
       const html2pdf = (await import('html2pdf.js')).default;
       
       const opt = {
-  margin: [10, 10, 10, 10] as [number, number, number, number],  // ← 4 значения + типизация
-  filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
-  image: { type: 'jpeg' as const, quality: 0.98 },
-  html2canvas: { 
-    scale: 2, 
-    useCORS: true,
-    logging: false 
-  },
-  jsPDF: { 
-    unit: 'mm' as const, 
-    format: 'a4' as const, 
-    orientation: 'portrait' as const 
-  }
-};
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          logging: false,
+          scrollY: 0
+        },
+        jsPDF: { 
+          unit: 'mm' as const, 
+          format: 'a4' as const, 
+          orientation: 'portrait' as const 
+        }
+      };
       
       await html2pdf().set(opt).from(element).save();
-      
-    } catch (error) {
-      console.error('PDF generation error:', error);
-      alert('Ошибка при создании PDF. Попробуйте Ctrl+P → Сохранить как PDF');
     }
-  };
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    // Фолбэк: открываем печать
+    alert('📄 Откроется окно печати. Выберите "Сохранить как PDF"');
+    window.print();
+  } finally {
+    // Возвращаем кнопку
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+  }
+};
 
   return (
     <div className="App">
@@ -525,6 +546,52 @@ export default function Home() {
           body {
             background: white !important;
           }
+            /* Мобильная оптимизация */
+@media (max-width: 768px) {
+  .export-btn {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .results {
+    font-size: 14px;
+  }
+  
+  .result-card {
+    padding: 15px;
+  }
+}
+
+@media print and (max-width: 768px) {
+  .App-header,
+  .upload-section,
+  .how-it-works,
+  .benefits,
+  .faq,
+  .footer,
+  .export-section {
+    display: none !important;
+  }
+  
+  .results {
+    display: block !important;
+    background: white !important;
+    color: black !important;
+    padding: 10px;
+    font-size: 12px;
+  }
+  
+  .result-card {
+    background: white !important;
+    border: 1px solid #ddd !important;
+    margin-bottom: 15px;
+    page-break-inside: avoid;
+  }
+  
+  body {
+    background: white !important;
+  }
+
         }
       `}</style>
     </div>
