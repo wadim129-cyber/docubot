@@ -50,6 +50,15 @@ Using Yandex GPT, it automatically extracts data, identifies risks, and generate
 ### PDF Report
 ![PDF Report](screenshots/pdf-report.png)
 
+### Main Interface
+![Homepage](screenshots/homepage.png)
+
+### Analysis Results
+![Analysis](screenshots/analysis-result.png)
+
+### PDF Report
+![PDF Report](screenshots/pdf-report.png)
+
 ---
 
 ## 🛠️ Tech Stack
