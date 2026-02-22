@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import html2pdf from 'html2pdf.js';
+import * as html2pdf from 'html2pdf.js';
 
 const API_URL = 'https://docubot-production-043f.up.railway.app';
 
@@ -47,29 +47,19 @@ export default function Home() {
     }
   };
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
   const element = document.querySelector('.results') as HTMLElement;
   if (!element) return;
   
   const opt = {
-    margin: [10, 10, 10, 10] as [number, number, number, number],
-    filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
-    image: { type: 'jpeg' as const, quality: 0.98 },
-    html2canvas: { 
-      scale: 2, 
-      useCORS: true, 
-      letterRendering: true,
-      logging: false
-    },
-    jsPDF: { 
-      unit: 'mm' as const, 
-      format: 'a4' as const, 
-      orientation: 'portrait' as const 
-    },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as const }
+    margin: [10, 10],
+    filename: `analysis-${Date.now()}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   };
   
-  html2pdf().set(opt).from(element).save();
+  await html2pdf().set(opt).from(element).save();
 };
 
   return (
