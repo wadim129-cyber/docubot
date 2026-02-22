@@ -1,5 +1,11 @@
 FROM python:3.11-slim
 
+# Устанавливаем шрифты с поддержкой кириллицы
+RUN apt-get update && apt-get install -y \
+    fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
+# ... остальной код
 # Устанавливаем рабочую директорию
 WORKDIR /app
 

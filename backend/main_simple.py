@@ -432,6 +432,21 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
     if not analysis:
         raise HTTPException(404, "Analysis not found")
     
+    # Регистрируем шрифт с поддержкой кириллицы
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    
+    try:
+        # Пробуем зарегистрировать шрифт DejaVu Sans (есть в Linux)
+        pdfmetrics.registerFont(TTFont('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
+        pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'))
+        main_font = 'DejaVuSans'
+        bold_font = 'DejaVuSans-Bold'
+    except:
+        # Если шрифт не найден, используем стандартный (кириллица не будет работать)
+        main_font = 'Helvetica'
+        bold_font = 'Helvetica-Bold'
+    
     # Создаём PDF
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
@@ -439,63 +454,73 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
     y_position = height - 50
     
     # Заголовок
-    p.setFont("Helvetica-Bold", 24)
+    p.setFont(bold_font, 24)
     p.drawString(100, y_position, "DocuBot AI - Analysis Report")
-    y_position -= 40
+    y_position -= 50
     
     # Основная информация
-    p.setFont("Helvetica-Bold", 14)
+    p.setFont(bold_font, 14)
     p.drawString(50, y_position, "📋 Основная информация")
-    y_position -= 25
+    y_position -= 30
     
-    p.setFont("Helvetica", 11)
+    p.setFont(main_font, 11)
     full_result = analysis.full_result if isinstance(analysis.full_result, dict) else json.loads(analysis.full_result)
     extracted_data = full_result.get('extracted_data', {})
     
     p.drawString(50, y_position, f"Тип документа: {extracted_data.get('document_type', 'N/A')}")
     y_position -= 20
-    p.drawString(50, y_position, f"Стороны: {', '.join(extracted_data.get('parties', []))}")
+    parties = extracted_data.get('parties', [])
+    if isinstance(parties, list):
+        parties_str = ', '.join(parties) if parties else 'N/A'
+    else:
+        parties_str = str(parties)
+    p.drawString(50, y_position, f"Стороны: {parties_str}")
     y_position -= 20
     p.drawString(50, y_position, f"Сумма: {extracted_data.get('total_amount', 'N/A')} {extracted_data.get('currency', '')}")
-    y_position -= 40
+    y_position -= 50
     
     # Риски
-    p.setFont("Helvetica-Bold", 14)
+    p.setFont(bold_font, 14)
     p.drawString(50, y_position, f"⚠️ Риски ({len(full_result.get('risk_flags', []))})")
-    y_position -= 25
+    y_position -= 30
     
     for flag in full_result.get('risk_flags', []):
-        p.setFont("Helvetica", 10)
-        p.drawString(50, y_position, f"• {flag.get('level', '').upper()} - {flag.get('category', '')}: {flag.get('description', '')}")
-        y_position -= 15
+        p.setFont(main_font, 10)
+        level = flag.get('level', '').upper()
+        category = flag.get('category', '')
+        description = flag.get('description', '')
+        p.drawString(50, y_position, f"• {level} - {category}: {description}")
+        y_position -= 20
         if y_position < 100:
             p.showPage()
             y_position = height - 50
     
     # Рекомендации
-    p.setFont("Helvetica-Bold", 14)
+    p.setFont(bold_font, 14)
     p.drawString(50, y_position, "✅ Рекомендации")
-    y_position -= 25
+    y_position -= 30
     
     for i, item in enumerate(full_result.get('action_items', []), 1):
-        p.setFont("Helvetica", 10)
+        p.setFont(main_font, 10)
         p.drawString(50, y_position, f"{i}. {item}")
-        y_position -= 18
+        y_position -= 20
         if y_position < 100:
             p.showPage()
             y_position = height - 50
     
     # Резюме
-    p.setFont("Helvetica-Bold", 14)
+    p.setFont(bold_font, 14)
     p.drawString(50, y_position, "📝 Резюме")
-    y_position -= 25
+    y_position -= 30
     
-    p.setFont("Helvetica", 11)
+    p.setFont(main_font, 11)
     summary_text = full_result.get('summary', '')
+    
+    # Разбиваем текст на строки
     words = summary_text.split()
     line = ""
     for word in words:
-        if len(line) + len(word) < 80:
+        if len(line) + len(word) < 70:
             line += word + " "
         else:
             p.drawString(50, y_position, line)
