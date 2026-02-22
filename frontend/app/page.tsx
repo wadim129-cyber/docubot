@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import jsPDF from 'jspdf';
+import html2pdf from 'html2pdf.js';
 
 const API_URL = 'https://docubot-production-043f.up.railway.app';
 
@@ -46,143 +46,22 @@ export default function Home() {
       setLoading(false);
     }
   };
- const handleExportPDF = () => {
-  if (!result || result.status !== 'success') return;
-  
-  const doc = new jsPDF();
-  const data = result.result;
-  
-  // Добавляем поддержку кириллицы через кастомный шрифт
-  // Используем стандартный шрифт с кодировкой Windows-1251
-  doc.addFileToVFS('Roboto-Regular.ttf', '');
-  doc.addFont('Roboto-Regular.ttf', 'Roboto', 'normal');
-  
-  // Временное решение: используем транслитерацию или упрощённый текст
-  const cyrillicText = (text: string) => {
-    // Простая замена для базовой поддержки
-    return text;
-  };
-  
-  // Заголовок
-  doc.setFillColor(26, 26, 46);
-  doc.rect(0, 0, 210, 40, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(20);
-  doc.text('DocuBot AI - Analysis Results', 105, 20, { align: 'center' });
-  doc.setFontSize(11);
-  doc.text(`Date: ${new Date().toLocaleDateString('ru-RU')}`, 105, 30, { align: 'center' });
-  
-  let yPos = 55;
-  
-  // Основная информация
-  doc.setTextColor(0, 217, 255);
-  doc.setFontSize(14);
-  doc.text('Basic Information', 14, yPos);
-  yPos += 10;
-  
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  doc.text(`Document Type: ${data.extracted_data.document_type}`, 14, yPos);
-  yPos += 6;
-  doc.text(`Subtype: ${data.extracted_data.document_subtype || 'N/A'}`, 14, yPos);
-  yPos += 6;
-  doc.text(`Parties: ${data.extracted_data.parties?.join(', ') || 'N/A'}`, 14, yPos);
-  yPos += 6;
-  doc.text(`Amount: ${data.extracted_data.total_amount ? `${data.extracted_data.total_amount.toLocaleString('ru-RU')} ${data.extracted_data.currency || 'RUB'}` : 'Not specified'}`, 14, yPos);
-  yPos += 10;
-  
-  // Финансовые условия
-  if (data.extracted_data.financial_terms && Object.values(data.extracted_data.financial_terms).some(v => v)) {
-    doc.setTextColor(0, 217, 255);
-    doc.setFontSize(14);
-    doc.text('Financial Terms', 14, yPos);
-    yPos += 10;
+
+  const handleExportPDF = () => {
+    const element = document.querySelector('.results');
+    if (!element) return;
     
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(10);
-    if (data.extracted_data.financial_terms.interest_rate) {
-      doc.text(`Interest Rate: ${data.extracted_data.financial_terms.interest_rate}`, 14, yPos);
-      yPos += 6;
-    }
-    if (data.extracted_data.financial_terms.loan_term) {
-      doc.text(`Term: ${data.extracted_data.financial_terms.loan_term}`, 14, yPos);
-      yPos += 6;
-    }
-    if (data.extracted_data.financial_terms.penalties) {
-      doc.text(`Penalties: ${data.extracted_data.financial_terms.penalties}`, 14, yPos);
-      yPos += 6;
-    }
-    yPos += 5;
-  }
-  
-  // Риски
-  doc.setTextColor(255, 165, 0);
-  doc.setFontSize(14);
-  doc.text(`Risks (${data.risk_flags?.length || 0})`, 14, yPos);
-  yPos += 10;
-  
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  if (data.risk_flags && data.risk_flags.length > 0) {
-    data.risk_flags.forEach((flag: any) => {
-      const riskText = `${flag.level?.toUpperCase()} - ${flag.category}: ${flag.description}`;
-      const splitText = doc.splitTextToSize(riskText, 180);
-      doc.text(splitText, 14, yPos);
-      yPos += splitText.length * 6;
-    });
-  } else {
-    doc.text('No risks detected', 14, yPos);
-    yPos += 6;
-  }
-  yPos += 5;
-  
-  // Рекомендации
-  doc.setTextColor(0, 255, 136);
-  doc.setFontSize(14);
-  doc.text('Recommendations', 14, yPos);
-  yPos += 10;
-  
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  if (data.action_items && data.action_items.length > 0) {
-    data.action_items.forEach((item: string, index: number) => {
-      doc.text(`${index + 1}. ${item}`, 14, yPos);
-      yPos += 6;
-    });
-  } else {
-    doc.text('No recommendations', 14, yPos);
-    yPos += 6;
-  }
-  yPos += 5;
-  
-  // Резюме
-  doc.setTextColor(0, 217, 255);
-  doc.setFontSize(14);
-  doc.text('Summary', 14, yPos);
-  yPos += 10;
-  
-  doc.setTextColor(0, 0, 0);
-  doc.setFontSize(10);
-  const summaryText = doc.splitTextToSize(data.summary || 'No summary', 180);
-  doc.text(summaryText, 14, yPos);
-  yPos += summaryText.length * 6 + 5;
-  
-  // Уверенность
-  doc.text(`AI Confidence: ${(data.confidence_score * 100).toFixed(0)}%`, 14, yPos);
-  yPos += 15;
-  
-  // Футер
-  doc.setFillColor(26, 26, 46);
-  const pageHeight = doc.internal.pageSize.height;
-  doc.rect(0, pageHeight - 20, 210, 20, 'F');
-  doc.setTextColor(136, 136, 136);
-  doc.setFontSize(9);
-  doc.text('© 2026 DocuBot AI • Not legal advice', 105, pageHeight - 10, { align: 'center' });
-  doc.text('https://docubot-three.vercel.app', 105, pageHeight - 5, { align: 'center' });
-  
-  // Сохраняем PDF
-  doc.save(`docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`);
-};
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    
+    html2pdf().set(opt).from(element).save();
+  };
 
   return (
     <div className="App">
@@ -314,14 +193,15 @@ export default function Home() {
               <p>{result.result.summary}</p>
               <p><strong>Уверенность:</strong> {(result.result.confidence_score * 100).toFixed(0)}%</p>
             </div>
+
+            {/* ===== КНОПКА ЭКСПОРТА ===== */}
+            <div className="export-section">
+              <button onClick={handleExportPDF} className="export-btn">
+                📥 Скачать PDF отчёт
+              </button>
+            </div>
           </div>
         )}
-        {/* ===== КНОПКА ЭКСПОРТА ===== */}
-        <div className="export-section">
-          <button onClick={handleExportPDF} className="export-btn">
-         📥 Скачать PDF отчёт
-        </button>
-      </div>
 
         {/* ===== СЕКЦИЯ: КАК ЭТО РАБОТАЕТ ===== */}
         <section className="how-it-works">
@@ -681,17 +561,7 @@ export default function Home() {
           font-weight: 500;
         }
         
-        /* ===== АДАПТИВНОСТЬ ===== */
-        @media (max-width: 768px) {
-          .steps { flex-direction: column; align-items: center; }
-          .benefits-grid { grid-template-columns: 1fr; }
-          .App-header h1 { font-size: 2em; }
-        }
-        @media (max-width: 600px) {
-          .result-card { padding: 20px; }
-          .result-card h3 { font-size: 1.2em; }
-        }
-                  /* ===== EXPORT BUTTON ===== */
+        /* ===== EXPORT BUTTON ===== */
         .export-section {
           text-align: center;
           margin: 30px 0;
@@ -716,6 +586,17 @@ export default function Home() {
         }
         .export-btn:active {
           transform: translateY(0);
+        }
+        
+        /* ===== АДАПТИВНОСТЬ ===== */
+        @media (max-width: 768px) {
+          .steps { flex-direction: column; align-items: center; }
+          .benefits-grid { grid-template-columns: 1fr; }
+          .App-header h1 { font-size: 2em; }
+        }
+        @media (max-width: 600px) {
+          .result-card { padding: 20px; }
+          .result-card h3 { font-size: 1.2em; }
         }
       `}</style>
     </div>
