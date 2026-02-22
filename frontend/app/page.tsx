@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import axios from 'axios';
-import * as html2pdf from 'html2pdf.js';
 
 const API_URL = 'https://docubot-production-043f.up.railway.app';
 
@@ -48,19 +47,39 @@ export default function Home() {
   };
 
   const handleExportPDF = async () => {
-  const element = document.querySelector('.results') as HTMLElement;
-  if (!element) return;
-  
-  const opt = {
-    margin: [10, 10],
-    filename: `analysis-${Date.now()}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    const element = document.querySelector('.results') as HTMLElement;
+    if (!element) {
+      alert('Ошибка: не удалось найти результаты');
+      return;
+    }
+    
+    try {
+      // Динамический импорт html2pdf
+      const html2pdf = (await import('html2pdf.js')).default;
+      
+      const opt = {
+        margin: [10, 10],
+        filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          logging: false 
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait' 
+        }
+      };
+      
+      await html2pdf().set(opt).from(element).save();
+      
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Ошибка при создании PDF. Попробуйте Ctrl+P → Сохранить как PDF');
+    }
   };
-  
-  await html2pdf().set(opt).from(element).save();
-};
 
   return (
     <div className="App">
@@ -478,6 +497,34 @@ export default function Home() {
         @media (max-width: 600px) {
           .result-card { padding: 20px; }
           .result-card h3 { font-size: 1.2em; }
+        }
+        @media print {
+          .App-header,
+          .upload-section,
+          .how-it-works,
+          .benefits,
+          .faq,
+          .footer,
+          .export-section {
+            display: none !important;
+          }
+          
+          .results {
+            display: block !important;
+            background: white !important;
+            color: black !important;
+            padding: 20px;
+          }
+          
+          .result-card {
+            background: white !important;
+            border: 1px solid #ddd !important;
+            page-break-inside: avoid;
+          }
+          
+          body {
+            background: white !important;
+          }
         }
       `}</style>
     </div>
