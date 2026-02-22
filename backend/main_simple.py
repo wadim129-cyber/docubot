@@ -421,7 +421,7 @@ async def get_stats(db: Session = Depends(get_db)):
 
 # ==================== PDF GENERATION ENDPOINT ====================
 
-@app.post("/api/generate-pdf/{analysis_id}")
+@app.get("/api/generate-pdf/{analysis_id}")
 async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
     """Генерация PDF отчёта"""
     
