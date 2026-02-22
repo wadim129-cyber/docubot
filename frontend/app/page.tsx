@@ -48,29 +48,29 @@ export default function Home() {
   };
 
   const handleExportPDF = () => {
-    const element = document.querySelector('.results');
-    if (!element) return;
-    
-    const opt = {
-      margin: [10, 10, 10, 10],
-      filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { 
-        scale: 2, 
-        useCORS: true, 
-        letterRendering: true,
-        logging: false
-      },
-      jsPDF: { 
-        unit: 'mm', 
-        format: 'a4', 
-        orientation: 'portrait' 
-      },
-      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
-    };
-    
-    html2pdf().set(opt).from(element).save();
+  const element = document.querySelector('.results') as HTMLElement;
+  if (!element) return;
+  
+  const opt = {
+    margin: [10, 10, 10, 10] as [number, number, number, number],
+    filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
+    image: { type: 'jpeg' as const, quality: 0.98 },
+    html2canvas: { 
+      scale: 2, 
+      useCORS: true, 
+      letterRendering: true,
+      logging: false
+    },
+    jsPDF: { 
+      unit: 'mm' as const, 
+      format: 'a4' as const, 
+      orientation: 'portrait' as const 
+    },
+    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] as const }
   };
+  
+  html2pdf().set(opt).from(element).save();
+};
 
   return (
     <div className="App">
