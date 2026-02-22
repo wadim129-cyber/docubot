@@ -1,42 +1,47 @@
 import os
-import logging
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Text
+from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
-
+# 🎯 Используем SQLite локально, PostgreSQL на Railway
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if DATABASE_URL:
-    engine = create_engine(DATABASE_URL)
-    logger.info(f"✅ PostgreSQL подключен")
+if DATABASE_URL and "railway" in DATABASE_URL:
+    # Production: PostgreSQL на Railway
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        connect_args={"sslmode": "require"}
+    )
 else:
-    logger.warning("⚠️ DATABASE_URL не задан, используем SQLite")
-    engine = create_engine("sqlite:///./docubot.db", connect_args={"check_same_thread": False})
+    # Local development: SQLite
+    engine = create_engine(
+        "sqlite:///./docubot_local.db",
+        connect_args={"check_same_thread": False}
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+# ==================== МОДЕЛИ ====================
 
 class AnalysisHistory(Base):
     __tablename__ = "analysis_history"
     
     id = Column(Integer, primary_key=True, index=True)
     filename = Column(String, nullable=False)
-    document_type = Column(String, nullable=True)
-    parties = Column(Text, nullable=True)
+    document_type = Column(String, nullable=False)
+    parties = Column(String, nullable=True)
     total_amount = Column(Float, nullable=True)
     currency = Column(String, nullable=True)
     summary = Column(Text, nullable=True)
     confidence_score = Column(Float, nullable=True)
     risk_count = Column(Integer, default=0)
-    full_result = Column(JSON, nullable=True)
+    full_result = Column(Text, nullable=True)
+    user_id = Column(String, default="web")
     created_at = Column(DateTime, default=datetime.utcnow)
-    user_id = Column(String, nullable=True)
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
+# ==================== ФУНКЦИИ ====================
 
 def get_db():
     db = SessionLocal()
@@ -44,3 +49,8 @@ def get_db():
         yield db
     finally:
         db.close()
+
+def init_db():
+    """Создаём таблицы"""
+    Base.metadata.create_all(bind=engine)
+    print("✅ Database initialized")

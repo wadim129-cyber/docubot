@@ -96,14 +96,21 @@ class YandexGPTService:
         self.iam_token = None
         self.token_expires_at = 0
         
+        # 🔑 Читаем ключ из переменной окружения (приоритет)
         key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
         if key_content:
             self.key_data = json.loads(key_content)
             logger.info("✅ Ключ загружен из переменной окружения")
+        # 🔑 Читаем из файла authorized_key.json (локально)
+        elif os.path.exists('authorized_key.json'):
+            with open('authorized_key.json', 'r', encoding='utf-8') as f:
+                self.key_data = json.load(f)
+            logger.info("✅ Ключ загружен из файла authorized_key.json")
+        # 🔑 Фолбэк: файл по пути (если указан)
         elif key_path and os.path.exists(key_path):
             with open(key_path, 'r', encoding='utf-8') as f:
                 self.key_data = json.load(f)
-            logger.info(f"✅ Ключ загружен из файла")
+            logger.info(f"✅ Ключ загружен из файла {key_path}")
         else:
             raise RuntimeError("❌ Не найден ключ Yandex GPT! Установите AUTHORIZED_KEY_CONTENT")
         
