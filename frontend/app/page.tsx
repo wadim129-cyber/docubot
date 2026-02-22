@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import axios from 'axios';
+import jsPDF from 'jspdf';
 
 const API_URL = 'https://docubot-production-043f.up.railway.app';
 
@@ -45,6 +46,191 @@ export default function Home() {
       setLoading(false);
     }
   };
+  const handleExportPDF = () => {
+  if (!result || result.status !== 'success') return;
+  
+  const doc = new jsPDF();
+  const data = result.result;
+  
+  // Настройки шрифта
+  doc.setFont('helvetica');
+  
+  // Заголовок
+  doc.setFillColor(26, 26, 46);
+  doc.rect(0, 0, 210, 40, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(22);
+  doc.text('🤖 DocuBot AI - Результаты анализа', 105, 20, { align: 'center' });
+  doc.setFontSize(12);
+  doc.text(`Дата: ${new Date().toLocaleDateString('ru-RU')}`, 105, 30, { align: 'center' });
+  
+  let yPos = 55;
+  
+  // Основная информация
+  doc.setTextColor(0, 217, 255);
+  doc.setFontSize(16);
+  doc.text('📋 Основная информация', 14, yPos);
+  yPos += 10;
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  doc.text(`Тип документа: ${data.extracted_data.document_type}`, 14, yPos);
+  yPos += 7;
+  doc.text(`Подтип: ${data.extracted_data.document_subtype || '—'}`, 14, yPos);
+  yPos += 7;
+  doc.text(`Стороны: ${data.extracted_data.parties?.join(', ') || '—'}`, 14, yPos);
+  yPos += 7;
+  doc.text(`Сумма: ${data.extracted_data.total_amount ? `${data.extracted_data.total_amount.toLocaleString('ru-RU')} ${data.extracted_data.currency || 'RUB'}` : 'Не указана'}`, 14, yPos);
+  yPos += 12;
+  
+  // Финансовые условия (если есть)
+  if (data.extracted_data.financial_terms && Object.values(data.extracted_data.financial_terms).some(v => v)) {
+    doc.setTextColor(0, 217, 255);
+    doc.setFontSize(16);
+    doc.text('💰 Финансовые условия', 14, yPos);
+    yPos += 10;
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    if (data.extracted_data.financial_terms.interest_rate) {
+      doc.text(`Процентная ставка: ${data.extracted_data.financial_terms.interest_rate}`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.financial_terms.loan_term) {
+      doc.text(`Срок: ${data.extracted_data.financial_terms.loan_term}`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.financial_terms.penalties) {
+      doc.text(`Штрафы: ${data.extracted_data.financial_terms.penalties}`, 14, yPos);
+      yPos += 7;
+    }
+    yPos += 5;
+  }
+  
+  // Условия аренды (если есть)
+  if (data.extracted_data.rental_terms && Object.values(data.extracted_data.rental_terms).some(v => v)) {
+    doc.setTextColor(0, 217, 255);
+    doc.setFontSize(16);
+    doc.text('🏠 Условия аренды', 14, yPos);
+    yPos += 10;
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    if (data.extracted_data.rental_terms.monthly_rent) {
+      doc.text(`Аренда: ${data.extracted_data.rental_terms.monthly_rent.toLocaleString('ru-RU')} ₽/мес`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.rental_terms.deposit) {
+      doc.text(`Залог: ${data.extracted_data.rental_terms.deposit.toLocaleString('ru-RU')} ₽`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.rental_terms.lease_duration) {
+      doc.text(`Срок: ${data.extracted_data.rental_terms.lease_duration}`, 14, yPos);
+      yPos += 7;
+    }
+    yPos += 5;
+  }
+  
+  // Данные заявителя (если есть)
+  if (data.extracted_data.applicant_info && Object.values(data.extracted_data.applicant_info).some(v => v)) {
+    doc.setTextColor(0, 217, 255);
+    doc.setFontSize(16);
+    doc.text('👤 Данные заявителя', 14, yPos);
+    yPos += 10;
+    
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    if (data.extracted_data.applicant_info.full_name) {
+      doc.text(`ФИО: ${data.extracted_data.applicant_info.full_name}`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.applicant_info.phone) {
+      doc.text(`Телефон: ${data.extracted_data.applicant_info.phone}`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.applicant_info.email) {
+      doc.text(`Email: ${data.extracted_data.applicant_info.email}`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.applicant_info.inn) {
+      doc.text(`ИНН: ${data.extracted_data.applicant_info.inn}`, 14, yPos);
+      yPos += 7;
+    }
+    if (data.extracted_data.applicant_info.monthly_income) {
+      doc.text(`Доход: ${data.extracted_data.applicant_info.monthly_income.toLocaleString('ru-RU')} ₽/мес`, 14, yPos);
+      yPos += 7;
+    }
+    yPos += 5;
+  }
+  
+  // Риски
+  doc.setTextColor(255, 165, 0);
+  doc.setFontSize(16);
+  doc.text(`⚠️ Риски (${data.risk_flags?.length || 0})`, 14, yPos);
+  yPos += 10;
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  if (data.risk_flags && data.risk_flags.length > 0) {
+    data.risk_flags.forEach((flag: any) => {
+      const riskText = `${flag.level?.toUpperCase()} - ${flag.category}: ${flag.description}`;
+      const splitText = doc.splitTextToSize(riskText, 180);
+      doc.text(splitText, 14, yPos);
+      yPos += splitText.length * 7;
+    });
+  } else {
+    doc.text('Риски не обнаружены', 14, yPos);
+    yPos += 7;
+  }
+  yPos += 5;
+  
+  // Рекомендации
+  doc.setTextColor(0, 255, 136);
+  doc.setFontSize(16);
+  doc.text('✅ Рекомендации', 14, yPos);
+  yPos += 10;
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  if (data.action_items && data.action_items.length > 0) {
+    data.action_items.forEach((item: string, index: number) => {
+      doc.text(`${index + 1}. ${item}`, 14, yPos);
+      yPos += 7;
+    });
+  } else {
+    doc.text('Рекомендаций нет', 14, yPos);
+    yPos += 7;
+  }
+  yPos += 5;
+  
+  // Резюме
+  doc.setTextColor(0, 217, 255);
+  doc.setFontSize(16);
+  doc.text('📝 Резюме', 14, yPos);
+  yPos += 10;
+  
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  const summaryText = doc.splitTextToSize(data.summary || 'Нет резюме', 180);
+  doc.text(summaryText, 14, yPos);
+  yPos += summaryText.length * 7 + 5;
+  
+  // Уверенность
+  doc.text(`Уверенность AI: ${(data.confidence_score * 100).toFixed(0)}%`, 14, yPos);
+  yPos += 15;
+  
+  // Футер
+  doc.setFillColor(26, 26, 46);
+  const pageHeight = doc.internal.pageSize.height;
+  doc.rect(0, pageHeight - 20, 210, 20, 'F');
+  doc.setTextColor(136, 136, 136);
+  doc.setFontSize(9);
+  doc.text('© 2026 DocuBot AI • Не является юридической консультацией', 105, pageHeight - 10, { align: 'center' });
+  doc.text('https://docubot-three.vercel.app', 105, pageHeight - 5, { align: 'center' });
+  
+  // Сохраняем PDF
+  doc.save(`docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`);
+};
 
   return (
     <div className="App">
@@ -178,6 +364,12 @@ export default function Home() {
             </div>
           </div>
         )}
+        {/* ===== КНОПКА ЭКСПОРТА ===== */}
+        <div className="export-section">
+          <button onClick={handleExportPDF} className="export-btn">
+         📥 Скачать PDF отчёт
+        </button>
+      </div>
 
         {/* ===== СЕКЦИЯ: КАК ЭТО РАБОТАЕТ ===== */}
         <section className="how-it-works">
@@ -546,6 +738,32 @@ export default function Home() {
         @media (max-width: 600px) {
           .result-card { padding: 20px; }
           .result-card h3 { font-size: 1.2em; }
+        }
+                  /* ===== EXPORT BUTTON ===== */
+        .export-section {
+          text-align: center;
+          margin: 30px 0;
+        }
+        .export-btn {
+          background: linear-gradient(90deg, #00d9ff, #00ff88);
+          color: #1a1a2e;
+          border: none;
+          padding: 15px 40px;
+          font-size: 1.1em;
+          font-weight: bold;
+          border-radius: 30px;
+          cursor: pointer;
+          transition: transform 0.2s, box-shadow 0.2s;
+          display: inline-flex;
+          align-items: center;
+          gap: 10px;
+        }
+        .export-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 30px rgba(0, 217, 255, 0.4);
+        }
+        .export-btn:active {
+          transform: translateY(0);
         }
       `}</style>
     </div>
