@@ -51,8 +51,6 @@ export default function Home() {
   window.print();
 };
   
-  html2pdf().set(opt).from(element).save();
-};
   return (
     <div className="App">
       <header className="App-header">
