@@ -47,31 +47,31 @@ export default function Home() {
     }
   };
 
- const handleExportPDF = () => {
-  const element = document.querySelector('.results');
-  if (!element) return;
-  
-  const opt = {
-    margin: [10, 10, 10, 10],
-    filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { 
-      scale: 2, 
-      useCORS: true, 
-      letterRendering: true,
-      logging: false
-    },
-    jsPDF: { 
-      unit: 'mm', 
-      format: 'a4', 
-      orientation: 'portrait' 
-    },
-    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+  const handleExportPDF = () => {
+    const element = document.querySelector('.results');
+    if (!element) return;
+    
+    const opt = {
+      margin: [10, 10, 10, 10],
+      filename: `docubot-analysis-${new Date().toISOString().slice(0, 10)}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        letterRendering: true,
+        logging: false
+      },
+      jsPDF: { 
+        unit: 'mm', 
+        format: 'a4', 
+        orientation: 'portrait' 
+      },
+      pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+    
+    html2pdf().set(opt).from(element).save();
   };
-  
-  html2pdf().set(opt).from(element).save();
-};
-  
+
   return (
     <div className="App">
       <header className="App-header">
@@ -607,88 +607,6 @@ export default function Home() {
           .result-card { padding: 20px; }
           .result-card h3 { font-size: 1.2em; }
         }
-                  /* ===== PRINT STYLES ===== */
-        @media print {
-  body {
-    background: white !important;
-  }
-  .App-header,
-  .upload-section,
-  .how-it-works,
-  .benefits,
-  .faq,
-  .footer,
-  .export-section {
-    display: none !important;
-  }
-  .results {
-    display: block !important;
-    background: white !important;
-    color: black !important;
-  }
-  .result-card {
-    background: white !important;
-    color: black !important;
-    border: 1px solid #ddd !important;
-    break-inside: avoid;
-  }
-  .risk-high {
-    background: #ffebee !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .risk-medium {
-    background: #fff3e0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .risk-low {
-    background: #e8f5e9 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-  @media print {
-  body {
-    background: white !important;
-  }
-  .App-header,
-  .upload-section,
-  .how-it-works,
-  .benefits,
-  .faq,
-  .footer,
-  .export-section {
-    display: none !important;
-  }
-  .results {
-    display: block !important;
-    background: white !important;
-    color: black !important;
-  }
-  .result-card {
-    background: white !important;
-    color: black !important;
-    border: 1px solid #ddd !important;
-    break-inside: avoid;
-  }
-  .risk-high {
-    background: #ffebee !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .risk-medium {
-    background: #fff3e0 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .risk-low {
-    background: #e8f5e9 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-}
-      
       `}</style>
     </div>
   );
