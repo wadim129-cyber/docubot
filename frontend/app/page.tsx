@@ -48,7 +48,7 @@ export default function Home() {
   };
 
   const handleExportPDF = () => {
-  const element = document.querySelector('.results');
+  const element = document.querySelector('.results') as HTMLElement;
   if (!element) return;
   
   const opt = {
