@@ -1,97 +1,110 @@
 # 🤖 DocuBot AI
 
-**AI-сервис для анализа юридических документов**
+**AI-powered document analysis service**
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109-green.svg)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-14-black.svg)](https://nextjs.org)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-blue.svg)](https://postgresql.org)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ---
 
-## 📋 Описание
+## 📋 About
 
-DocuBot AI — это интеллектуальный сервис для анализа юридических документов (договоры, счета, акты). 
-Используя Yandex GPT, система автоматически извлекает данные, находит риски и формирует рекомендации.
+DocuBot AI is an intelligent service for analyzing legal documents (contracts, invoices, acts). 
+Using Yandex GPT, it automatically extracts data, identifies risks, and generates recommendations.
 
-### ✨ Возможности
+### ✨ Features
 
-- ✅ **Анализ PDF документов** за 5-10 секунд
-- ✅ **Извлечение данных**: стороны, суммы, даты, обязательства
-- ✅ **Поиск рисков**: финансовые, юридические, операционные
-- ✅ **PDF отчёты** с полным анализом
-- ✅ **Telegram бот** для работы 24/7
-- ✅ **История анализов** в базе данных
-- ✅ **Кэширование** для повторных документов
+- ✅ **PDF Analysis** in 5-10 seconds
+- ✅ **Data Extraction**: parties, amounts, dates, obligations
+- ✅ **Risk Detection**: financial, legal, operational
+- ✅ **PDF Reports** with full analysis
+- ✅ **Telegram Bot** for 24/7 access
+- ✅ **Analysis History** in database
+- ✅ **Smart Caching** for repeated documents
 
 ---
 
-## 🌐 Демо
+## 🌐 Live Demo
 
-### Веб-версия
+### Web Application
 🔗 **Frontend**: https://docubot-three.vercel.app
 
-### Telegram бот
+### Telegram Bot
 🤖 **@DocuBotAI_bot**: https://t.me/DocuBotAI_bot
 
-### API
-🔌 **Backend**: https://docubot-production-043f.up.railway.app
+### API Documentation
+🔌 **Backend**: https://docubot-production-043f.up.railway.app/docs
 
 ---
 
-## 📸 Скриншоты
+## 📸 Screenshots
 
-### Главная страница
-![Главная страница](screenshots/homepage.png)
+### Main Interface
+![Homepage](screenshots/homepage.png)
 
-### Результат анализа
-![Результат](screenshots/analysis-result.png)
+### Analysis Results
+![Analysis](screenshots/analysis-result.png)
 
-### PDF отчёт
-![PDF](screenshots/pdf-report.png)
-
-### Telegram бот
-![Бот](screenshots/telegram-bot.png)
+### PDF Report
+![PDF Report](screenshots/pdf-report.png)
 
 ---
 
-## 🛠️ Технологии
+## 🛠️ Tech Stack
 
 ### Backend
 - **Python 3.11**
 - **FastAPI** — REST API
 - **SQLAlchemy** — ORM
-- **PostgreSQL** — база данных
-- **Yandex GPT** — AI анализ
-- **ReportLab** — генерация PDF
-- **PyPDF2** — чтение PDF
-- **PyJWT** — аутентификация
+- **PostgreSQL/SQLite** — Database
+- **Yandex GPT** — AI Analysis
+- **ReportLab** — PDF Generation
+- **PyPDF2** — PDF Parsing
+- **PyJWT** — Authentication
 
 ### Frontend
-- **Next.js 14** — React фреймворк
-- **TypeScript** — типизация
-- **Axios** — HTTP запросы
-- **html2pdf.js** — клиентская генерация PDF
+- **Next.js 14** — React Framework
+- **TypeScript** — Type Safety
+- **Axios** — HTTP Client
+- **Tailwind CSS** — Styling
 
 ### DevOps
-- **Railway** — хостинг backend + bot
-- **Vercel** — хостинг frontend
-- **Docker** — контейнеризация
+- **Railway** — Backend Hosting
+- **Vercel** — Frontend Hosting
+- **Docker** — Containerization
 - **GitHub Actions** — CI/CD
 
 ---
 
-## 🚀 Установка и запуск
+## 🚀 Quick Start
 
-### Требования
+### Prerequisites
 - Python 3.11+
 - Node.js 18+
-- PostgreSQL 15+
-- Yandex Cloud аккаунт (для GPT API)
+- Yandex Cloud account (for GPT API)
 
-### 1. Клонируйте репозиторий
+### Backend Setup
 
 ```bash
-git clone https://github.com/wadim129-cyber/docubot.git
-cd docubot
+cd backend
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+.\venv\Scripts\Activate.ps1  # Windows
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file
+cp .env.example .env
+
+# Edit .env with your credentials
+# - YANDEX_FOLDER_ID
+# - AUTHORIZED_KEY_CONTENT (Yandex Cloud service account key)
+# - DATABASE_URL (optional, defaults to SQLite)
+
+# Run server
+python main_simple.py
