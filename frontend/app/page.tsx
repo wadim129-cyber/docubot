@@ -489,6 +489,32 @@ export default function Home() {
           .result-card { background: white !important; border: 1px solid #ddd !important; page-break-inside: avoid; }
           body { background: white !important; }
         }
+        /* Мобильная версия - перемещаем переключатель языков */
+@media (max-width: 768px) {
+  /* Если LanguageSwitcher имеет класс .language-switcher */
+  .language-switcher {
+    position: static !important;
+    margin: 20px auto;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+  }
+  
+  /* Или если нужно в хедере оставить но ниже */
+  .App-header {
+    position: relative;
+    padding-top: 20px;
+    padding-bottom: 60px; /* Добавляем место для переключателя */
+  }
+  
+  /* Альтернативный вариант - абсолютно позиционировать ниже */
+  .language-switcher {
+    position: absolute !important;
+    top: 100% !important;
+    right: 20px;
+    margin-top: 10px;
+  }
+}
       `}</style>
     </div>
   );
