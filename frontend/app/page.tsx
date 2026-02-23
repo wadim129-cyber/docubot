@@ -2,10 +2,14 @@
 
 import { useState } from 'react';
 import axios from 'axios';
+import { useLanguage } from '../context/LanguageContext';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
+// 🔧 Исправлено: убраны лишние пробелы в URL
 const API_URL = 'https://docubot-production-043f.up.railway.app';
 
 export default function Home() {
+  const { t } = useLanguage();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
@@ -21,7 +25,7 @@ export default function Home() {
 
   const handleUpload = async () => {
     if (!file) {
-      setError('Выберите файл для загрузки');
+      setError(t('selectFile'));
       return;
     }
 
@@ -33,14 +37,12 @@ export default function Home() {
       formData.append('file', file);
 
       const response = await axios.post(`${API_URL}/api/analyze`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
 
       setResult(response.data);
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Ошибка при анализе документа');
+      setError(err.response?.data?.error || t('analysisError'));
     } finally {
       setLoading(false);
     }
@@ -49,19 +51,16 @@ export default function Home() {
   const handleExportPDF = async () => {
     const btn = document.querySelector('.export-btn') as HTMLButtonElement;
     const originalText = btn.innerHTML;
-    btn.innerHTML = '⏳ Генерация PDF...';
+    btn.innerHTML = '⏳ Generating PDF...';
     btn.disabled = true;
     
     try {
-      // Получаем последний анализ из истории
       const historyResponse = await fetch(`${API_URL}/api/history?limit=1`);
       const historyData = await historyResponse.json();
       
-      if (historyData.analyses && historyData.analyses.length > 0) {
-        const latestAnalysisId = historyData.analyses[0].id;
-        
-        // Запрашиваем PDF с сервера
-        const response = await fetch(`${API_URL}/api/generate-pdf/${latestAnalysisId}`);
+      if (historyData.analyses?.length > 0) {
+        const latestId = historyData.analyses[0].id;
+        const response = await fetch(`${API_URL}/api/generate-pdf/${latestId}`);
         
         if (!response.ok) throw new Error('Failed to generate PDF');
         
@@ -79,7 +78,7 @@ export default function Home() {
       }
     } catch (error) {
       console.error('PDF error:', error);
-      alert('❌ Ошибка при создании PDF. Попробуйте ещё раз.');
+      alert('❌ Error creating PDF. Please try again.');
     } finally {
       btn.innerHTML = originalText;
       btn.disabled = false;
@@ -88,47 +87,71 @@ export default function Home() {
 
   return (
     <div className="App">
+      {/* Language Switcher */}
+      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
+        <LanguageSwitcher />
+      </div>
+
+      {/* Header */}
       <header className="App-header">
-        <h1>🤖 DocuBot AI</h1>
-        <p>AI-агент для анализа документов</p>
+        <h1>🤖 {t('title')}</h1>
+        <p>{t('subtitle')}</p>
       </header>
 
+      {/* Main Content */}
       <main className="main-content">
+        
+        {/* Upload Section */}
         <div className="upload-section">
-          <h2>📄 Загрузите документ</h2>
-          <input 
-            type="file" 
-            accept=".pdf" 
-            onChange={handleFileChange}
-            className="file-input"
-          />
+          <h2>📄 {t('uploadTitle')}</h2>
+          <p style={{ color: '#888', marginBottom: '15px' }}>{t('uploadSubtitle')}</p>
+          
+          {/* Custom File Upload Button */}
+          <div className="custom-file-upload">
+            <input
+              id="file-upload"
+              type="file"
+              accept=".pdf"
+              onChange={handleFileChange}
+              className="file-input-hidden"
+            />
+            <label htmlFor="file-upload" className="file-upload-label">
+              <span className="upload-icon">📁</span>
+              <span className="upload-text">
+                {file ? `✅ ${file.name}` : t('chooseFile')}
+              </span>
+            </label>
+          </div>
+          
           <button 
             onClick={handleUpload} 
             disabled={loading || !file}
             className="upload-btn"
           >
-            {loading ? '⏳ Анализирую...' : '🚀 Анализировать'}
+            {loading ? t('analyzing') : t('analyzeButton')}
           </button>
         </div>
 
-        {error && (
-          <div className="error-message">❌ {error}</div>
-        )}
+        {/* Error Message */}
+        {error && <div className="error-message">❌ {error}</div>}
 
-        {result && result.status === 'success' && (
+        {/* Results */}
+        {result?.status === 'success' && (
           <div className="results">
-            <h2>📊 Результаты анализа</h2>
+            <h2>📊 {t('resultsTitle')}</h2>
             
+            {/* Basic Info */}
             <div className="result-card">
-              <h3>📋 Основная информация</h3>
-              <p><strong>Тип:</strong> {result.result.extracted_data.document_type}</p>
-              <p><strong>Подтип:</strong> {result.result.extracted_data.document_subtype || '—'}</p>
-              <p><strong>Стороны:</strong> {result.result.extracted_data.parties?.join(', ') || '—'}</p>
-              <p><strong>Сумма:</strong> {result.result.extracted_data.total_amount ? `${result.result.extracted_data.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.currency || 'RUB'}` : 'Не указана'}</p>
+              <h3>📋 {t('basicInfo')}</h3>
+              <p><strong>{t('type')}:</strong> {result.result.extracted_data.document_type}</p>
+              <p><strong>{t('subtype')}:</strong> {result.result.extracted_data.document_subtype || '—'}</p>
+              <p><strong>{t('parties')}:</strong> {result.result.extracted_data.parties?.join(', ') || '—'}</p>
+              <p><strong>{t('amount')}:</strong> {result.result.extracted_data.total_amount ? `${result.result.extracted_data.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.currency || 'RUB'}` : t('notSpecified')}</p>
             </div>
 
+            {/* Risks */}
             <div className="result-card">
-              <h3>⚠️ Риски ({result.result.risk_flags?.length || 0})</h3>
+              <h3>⚠️ {t('risks')} ({result.result.risk_flags?.length || 0})</h3>
               {result.result.risk_flags?.map((flag: any, index: number) => (
                 <div key={index} className={`risk-flag risk-${flag.level}`}>
                   <strong>{flag.level?.toUpperCase()} - {flag.category}</strong>
@@ -138,8 +161,9 @@ export default function Home() {
               ))}
             </div>
 
+            {/* Recommendations */}
             <div className="result-card">
-              <h3>✅ Рекомендации</h3>
+              <h3>✅ {t('recommendations')}</h3>
               <ul>
                 {result.result.action_items?.map((item: string, index: number) => (
                   <li key={index}>{item}</li>
@@ -147,105 +171,90 @@ export default function Home() {
               </ul>
             </div>
 
+            {/* Summary */}
             <div className="result-card">
-              <h3>📝 Резюме</h3>
+              <h3>📝 {t('summary')}</h3>
               <p>{result.result.summary}</p>
-              <p><strong>Уверенность:</strong> {(result.result.confidence_score * 100).toFixed(0)}%</p>
+              <p><strong>{t('confidence')}:</strong> {(result.result.confidence_score * 100).toFixed(0)}%</p>
             </div>
 
+            {/* Export Button */}
             <div className="export-section">
               <button onClick={handleExportPDF} className="export-btn">
-                📥 Скачать PDF отчёт
+                📥 {t('downloadPDF')}
               </button>
             </div>
           </div>
         )}
 
+        {/* How It Works */}
         <section className="how-it-works">
-          <h2>📋 Как это работает?</h2>
+          <h2>📋 {t('howItWorks')}</h2>
           <div className="steps">
-            <div className="step">
-              <div className="step-number">1</div>
-              <h3>📄 Загрузите документ</h3>
-              <p>Выберите PDF файл: договор, счёт, акт или другой юридический документ</p>
-            </div>
-            <div className="step">
-              <div className="step-number">2</div>
-              <h3>🤖 AI анализирует</h3>
-              <p>Нейросеть читает документ, извлекает данные и ищет риски</p>
-            </div>
-            <div className="step">
-              <div className="step-number">3</div>
-              <h3>📊 Получите результат</h3>
-              <p>Увидите краткое резюме, риски и рекомендации на человеческом языке</p>
-            </div>
+            {[1, 2, 3].map((step) => (
+              <div key={step} className="step">
+                <div className="step-number">{step}</div>
+                <h3>{t(`step${step}`)}</h3>
+                <p>{t(`step${step}Desc`)}</p>
+              </div>
+            ))}
           </div>
         </section>
 
+        {/* Benefits */}
         <section className="benefits">
-          <h2>⭐ Почему DocuBot?</h2>
+          <h2>⭐ {t('whyDocubot')}</h2>
           <div className="benefits-grid">
-            <div className="benefit-card">
-              <span className="benefit-icon">⚡</span>
-              <h3>Быстро</h3>
-              <p>Анализ за 5-10 секунд вместо 30 минут чтения</p>
-            </div>
-            <div className="benefit-card">
-              <span className="benefit-icon">💰</span>
-              <h3>Дёшево</h3>
-              <p>Бесплатно для старта, дешевле чем консультация юриста</p>
-            </div>
-            <div className="benefit-card">
-              <span className="benefit-icon">🔒</span>
-              <h3>Конфиденциально</h3>
-              <p>Ваши документы не передаются третьим лицам</p>
-            </div>
-            <div className="benefit-card">
-              <span className="benefit-icon">🌙</span>
-              <h3>24/7</h3>
-              <p>Работает круглосуточно, без выходных и праздников</p>
-            </div>
+            {[
+              { icon: '⚡', key: 'fast' },
+              { icon: '💰', key: 'cheap' },
+              { icon: '🔒', key: 'confidential' },
+              { icon: '🌙', key: 'alwaysOn' }
+            ].map(({ icon, key }) => (
+              <div key={key} className="benefit-card">
+                <span className="benefit-icon">{icon}</span>
+                <h3>{t(key)}</h3>
+                <p>{t(`${key}Desc`)}</p>
+              </div>
+            ))}
           </div>
         </section>
 
+        {/* FAQ */}
         <section className="faq">
-          <h2>❓ Часто задаваемые вопросы</h2>
+          <h2>❓ {t('faq')}</h2>
           <div className="faq-list">
-            <details className="faq-item">
-              <summary>📁 Какие форматы документов поддерживаете?</summary>
-              <p>Сейчас поддерживаем только <strong>PDF</strong>. В планах: DOCX, изображения, сканы.</p>
-            </details>
-            <details className="faq-item">
-              <summary>🎯 Насколько точен анализ?</summary>
-              <p>Точность ~70-90% в зависимости от качества документа. Это <strong>помощник для первичного анализа</strong>, а не замена юриста.</p>
-            </details>
-            <details className="faq-item">
-              <summary>⚖️ Это заменяет юриста?</summary>
-              <p><strong>Нет.</strong> DocuBot помогает быстро оценить документ и найти "красные флаги". Для важных сделок всегда консультируйтесь с профессионалом.</p>
-            </details>
-            <details className="faq-item">
-              <summary>🔐 Куда попадают мои документы?</summary>
-              <p>Документы обрабатываются через Yandex Cloud API и не сохраняются на наших серверах. Мы не используем ваши данные для обучения моделей.</p>
-            </details>
+            {[1, 2, 3, 4].map((num) => (
+              <details key={num} className="faq-item">
+                <summary>{t(`faq${num}Q`)}</summary>
+                <p>{t(`faq${num}A`)}</p>
+              </details>
+            ))}
           </div>
         </section>
 
+        {/* Footer */}
         <footer className="footer">
           <div className="footer-links">
-            <a href="/history" className="footer-link">📊 История анализов</a>
-            <a href="https://t.me/DocuBotAI_bot" target="_blank" rel="noopener noreferrer" className="footer-link">🤖 Telegram бот</a>
-            <a href="#" className="footer-link">📧 Контакты</a>
+            <a href="/history" className="footer-link">📊 {t('history')}</a>
+            {/* 🔧 Исправлено: убраны пробелы в ссылке Telegram */}
+            <a href="https://t.me/DocuBotAI_bot" target="_blank" rel="noopener noreferrer" className="footer-link">
+              🤖 {t('telegramBot')}
+            </a>
+            <a href="#" className="footer-link">📧 {t('contacts')}</a>
           </div>
-          <p className="footer-text">© 2026 DocuBot AI • Не является юридической консультацией</p>
+          <p className="footer-text">© 2026 DocuBot AI • {t('disclaimer')}</p>
         </footer>
       </main>
 
+      {/* Styles */}
       <style jsx global>{`
         .App {
           min-height: 100vh;
           background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
           color: #fff;
           font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          position: relative;
         }
         .App-header {
           padding: 40px 20px;
@@ -275,18 +284,33 @@ export default function Home() {
           border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .upload-section h2 { margin-top: 0; color: #00d9ff; }
-        .file-input {
-          display: block;
-          margin: 20px auto;
-          padding: 15px;
-          background: rgba(255, 255, 255, 0.1);
-          border: 2px dashed rgba(255, 255, 255, 0.3);
-          border-radius: 10px;
-          color: #fff;
-          width: 100%;
-          max-width: 400px;
+        
+        /* Custom File Upload - Global Styles */
+        .file-input-hidden { display: none !important; }
+        .custom-file-upload { margin: 25px auto; max-width: 450px; }
+        .file-upload-label {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 12px;
+          padding: 18px 30px;
+          background: rgba(255, 255, 255, 0.05);
+          border: 2px dashed rgba(0, 217, 255, 0.4);
+          border-radius: 12px;
           cursor: pointer;
+          transition: all 0.3s ease;
+          text-align: center;
+          user-select: none;
         }
+        .file-upload-label:hover {
+          background: rgba(0, 217, 255, 0.1);
+          border-color: rgba(0, 217, 255, 0.7);
+          transform: translateY(-3px);
+          box-shadow: 0 10px 30px rgba(0, 217, 255, 0.25);
+        }
+        .upload-icon { font-size: 1.6em; flex-shrink: 0; }
+        .upload-text { color: #ffffff; font-size: 1.05em; font-weight: 500; line-height: 1.4; }
+        
         .upload-btn {
           background: linear-gradient(90deg, #00d9ff, #00ff88);
           color: #1a1a2e;
@@ -303,6 +327,7 @@ export default function Home() {
           box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
         }
         .upload-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
         .error-message {
           background: rgba(255, 0, 0, 0.2);
           border: 1px solid rgba(255, 0, 0, 0.5);
@@ -343,21 +368,10 @@ export default function Home() {
         .risk-flag em { display: block; margin-top: 10px; color: #00d9ff; font-style: normal; }
         .result-card ul { padding-left: 20px; }
         .result-card li { margin: 10px 0; color: #ccc; }
-        .how-it-works {
-          padding: 40px 20px;
-          text-align: center;
-        }
-        .how-it-works h2 {
-          color: #00d9ff;
-          margin-bottom: 30px;
-          font-size: 1.8em;
-        }
-        .steps {
-          display: flex;
-          gap: 20px;
-          justify-content: center;
-          flex-wrap: wrap;
-        }
+        
+        .how-it-works, .benefits { padding: 40px 20px; text-align: center; }
+        .how-it-works h2, .benefits h2 { color: #00d9ff; margin-bottom: 30px; font-size: 1.8em; }
+        .steps { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
         .step {
           background: rgba(255, 255, 255, 0.05);
           padding: 25px;
@@ -366,29 +380,16 @@ export default function Home() {
           border: 1px solid rgba(255, 255, 255, 0.1);
         }
         .step-number {
-          width: 50px;
-          height: 50px;
+          width: 50px; height: 50px;
           background: linear-gradient(90deg, #00d9ff, #00ff88);
           border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: bold;
-          font-size: 1.5em;
-          color: #1a1a2e;
+          display: flex; align-items: center; justify-content: center;
+          font-weight: bold; font-size: 1.5em; color: #1a1a2e;
           margin: 0 auto 15px;
         }
         .step h3 { margin: 10px 0; color: #fff; }
         .step p { color: #888; font-size: 0.95em; margin: 0; }
-        .benefits {
-          padding: 40px 20px;
-          text-align: center;
-        }
-        .benefits h2 {
-          color: #00d9ff;
-          margin-bottom: 30px;
-          font-size: 1.8em;
-        }
+        
         .benefits-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -407,17 +408,9 @@ export default function Home() {
         .benefit-icon { font-size: 2em; display: block; margin-bottom: 10px; }
         .benefit-card h3 { margin: 10px 0; color: #fff; }
         .benefit-card p { color: #888; font-size: 0.95em; margin: 0; }
-        .faq {
-          padding: 40px 20px;
-          max-width: 700px;
-          margin: 0 auto;
-        }
-        .faq h2 {
-          color: #00d9ff;
-          text-align: center;
-          margin-bottom: 30px;
-          font-size: 1.8em;
-        }
+        
+        .faq { padding: 40px 20px; max-width: 700px; margin: 0 auto; }
+        .faq h2 { color: #00d9ff; text-align: center; margin-bottom: 30px; font-size: 1.8em; }
         .faq-list { display: flex; flex-direction: column; gap: 15px; }
         .faq-item {
           background: rgba(255, 255, 255, 0.05);
@@ -442,37 +435,21 @@ export default function Home() {
           transition: transform 0.2s;
         }
         .faq-item[open] summary::after { transform: rotate(180deg); }
-        .faq-item p {
-          padding: 0 20px 20px;
-          color: #888;
-          margin: 0;
-          line-height: 1.5;
-        }
+        .faq-item p { padding: 0 20px 20px; color: #888; margin: 0; line-height: 1.5; }
         .faq-item p strong { color: #fff; }
+        
         .footer {
           padding: 40px 20px;
           text-align: center;
           border-top: 1px solid rgba(255, 255, 255, 0.1);
           margin-top: 40px;
         }
-        .footer-links {
-          display: flex;
-          gap: 20px;
-          justify-content: center;
-          flex-wrap: wrap;
-          margin-bottom: 20px;
-        }
-        .footer-link {
-          color: #00d9ff;
-          text-decoration: none;
-          transition: color 0.2s;
-        }
+        .footer-links { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px; }
+        .footer-link { color: #00d9ff; text-decoration: none; transition: color 0.2s; }
         .footer-link:hover { color: #00ff88; }
         .footer-text { color: #666; font-size: 0.9em; margin: 0; }
-        .export-section {
-          text-align: center;
-          margin: 30px 0;
-        }
+        
+        .export-section { text-align: center; margin: 30px 0; }
         .export-btn {
           background: linear-gradient(90deg, #00d9ff, #00ff88);
           color: #1a1a2e;
@@ -491,19 +468,12 @@ export default function Home() {
           transform: translateY(-2px);
           box-shadow: 0 10px 30px rgba(0, 217, 255, 0.4);
         }
-        .export-btn:active {
-          transform: translateY(0);
-        }
         
-        /* Мобильная оптимизация */
         @media (max-width: 768px) {
           .steps { flex-direction: column; align-items: center; }
           .benefits-grid { grid-template-columns: 1fr; }
           .App-header h1 { font-size: 2em; }
-          .export-btn {
-            width: 100%;
-            max-width: 300px;
-          }
+          .export-btn { width: 100%; max-width: 300px; }
           .results { font-size: 14px; }
           .result-card { padding: 15px; }
         }
@@ -513,34 +483,11 @@ export default function Home() {
           .result-card h3 { font-size: 1.2em; }
         }
         
-        /* Печать — только если пользователь сам нажмёт Ctrl+P */
         @media print {
-          .App-header,
-          .upload-section,
-          .how-it-works,
-          .benefits,
-          .faq,
-          .footer,
-          .export-section {
-            display: none !important;
-          }
-          
-          .results {
-            display: block !important;
-            background: white !important;
-            color: black !important;
-            padding: 20px;
-          }
-          
-          .result-card {
-            background: white !important;
-            border: 1px solid #ddd !important;
-            page-break-inside: avoid;
-          }
-          
-          body {
-            background: white !important;
-          }
+          .App-header, .upload-section, .how-it-works, .benefits, .faq, .footer, .export-section { display: none !important; }
+          .results { display: block !important; background: white !important; color: black !important; padding: 20px; }
+          .result-card { background: white !important; border: 1px solid #ddd !important; page-break-inside: avoid; }
+          body { background: white !important; }
         }
       `}</style>
     </div>
