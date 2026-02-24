@@ -88,15 +88,13 @@ export default function Home() {
   return (
     <div className="App">
       {/* Language Switcher */}
-      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 1000 }}>
-        <LanguageSwitcher />
-      </div>
-
-      {/* Header */}
-      <header className="App-header">
-        <h1>🤖 {t('title')}</h1>
-        <p>{t('subtitle')}</p>
-      </header>
+       <header className="App-header">
+         <div className="header-content">
+          <h1>🤖 {t('title')}</h1>
+          <p>{t('subtitle')}</p>
+         </div>
+         <LanguageSwitcher />
+       </header>
 
       {/* Main Content */}
       <main className="main-content">
@@ -488,29 +486,46 @@ export default function Home() {
           .results { display: block !important; background: white !important; color: black !important; padding: 20px; }
           .result-card { background: white !important; border: 1px solid #ddd !important; page-break-inside: avoid; }
         
-          /* Мобильная версия - перемещаем переключатель языков */
+                  /* 🔧 Мобильная версия - переключатель языков */
         @media (max-width: 768px) {
-        /* Если LanguageSwitcher имеет класс .language-switcher */
-        .language-switcher {
-          position: static !important;
-          margin: 20px auto;
-          display: flex;
-          justify-content: center;
-          gap: 10px;
+          .App-header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            padding: 30px 20px 20px !important;
+          }
+          
+          .App-header h1 {
+            font-size: 1.8em !important;
+            margin: 0 !important;
+          }
+          
+          .language-switcher {
+            position: static !important;
+            margin: 0 !important;
+            transform: scale(0.9) !important;
+          }
         }
-        /* Или если нужно в хедере оставить но ниже */
-        .App-header {
-          position: relative;
-          padding-top: 20px;
-          padding-bottom: 60px; /* Добавляем место для переключателя */
-        }
-        /* Альтернативный вариант - абсолютно позиционировать ниже */
-        .language-switcher {
-          position: absolute !important;
-          top: 100% !important;
-          right: 20px;
-          margin-top: 10px;
-          body { background: white !important; }
+        
+        @media print {
+          .App-header, .upload-section, .how-it-works, .benefits, .faq, .footer, .export-section { 
+            display: none !important; 
+          }
+          .results { 
+            display: block !important; 
+            background: white !important; 
+            color: black !important; 
+            padding: 20px; 
+          }
+          .result-card { 
+            background: white !important; 
+            border: 1px solid #ddd !important; 
+            page-break-inside: avoid; 
+          }
+          body { 
+            background: white !important; 
+          }
         }
           
       `}</style>

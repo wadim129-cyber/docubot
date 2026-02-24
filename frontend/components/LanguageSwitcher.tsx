@@ -6,7 +6,14 @@ export default function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
 
   return (
-    <div style={{ display: 'flex', gap: '10px', padding: '10px' }}>
+    <div 
+      className="language-switcher"
+      style={{ 
+        display: 'flex', 
+        gap: '10px', 
+        padding: '10px' 
+      }}
+    >
       <button
         onClick={() => setLanguage('ru')}
         style={{
