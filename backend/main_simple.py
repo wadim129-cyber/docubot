@@ -24,6 +24,8 @@ from sqlalchemy import func
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # Загружаем .env
 load_dotenv()
@@ -33,12 +35,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ==================== БАЗА ДАННЫХ ====================
-
 from database import get_db, AnalysisHistory, init_db
 from sqlalchemy import desc
 
 # ==================== КЭШИРОВАНИЕ ====================
-
 @lru_cache(maxsize=50)
 def get_text_hash(text: str) -> str:
     """Хэш для кэширования похожих документов"""
@@ -48,13 +48,12 @@ def get_text_hash(text: str) -> str:
 _analysis_cache: Dict[str, 'AnalysisResult'] = {}
 
 # ==================== МОДЕЛИ ====================
-
 class DocumentType(str, Enum):
-    contract = "contract"
-    invoice = "invoice"
-    act = "act"
-    application = "application"
-    other = "other"
+    CONTRACT = "contract"
+    INVOICE = "invoice"
+    ACT = "act"
+    APPLICATION = "application"
+    OTHER = "other"
 
 class RiskLevel(str, Enum):
     LOW = "low"
@@ -89,7 +88,6 @@ class DocumentUploadResponse(BaseModel):
     error: Optional[str] = None
 
 # ==================== YANDEX GPT SERVICE ====================
-
 class YandexGPTService:
     def __init__(self, folder_id: str, key_path: str = None):
         self.folder_id = folder_id
@@ -170,7 +168,6 @@ class YandexGPTService:
         return response.json()['result']['alternatives'][0]['message']['text']
 
 # ==================== DOCUMENT AGENT ====================
-
 class DocumentAgent:
     def __init__(self, gpt_service: YandexGPTService):
         self.gpt = gpt_service
@@ -288,7 +285,6 @@ class DocumentAgent:
         return result
 
 # ==================== FASTAPI APP ====================
-
 app = FastAPI(title="DocuBot API", description="AI-агент для анализа документов", version="0.2.0")
 
 app.add_middleware(
@@ -343,7 +339,7 @@ async def analyze_document(file: UploadFile = File(...), db: Session = Depends(g
                 summary=result.summary,
                 confidence_score=result.confidence_score,
                 risk_count=len(result.risk_flags),
-                full_result=result.dict(),
+                full_result=json.dumps(result.model_dump()),  # 🔧 Сериализуем в JSON строку
                 user_id="web"
             )
             db.add(history)
@@ -403,7 +399,7 @@ async def get_stats(db: Session = Depends(get_db)):
         ).count()
         
         avg_confidence = db.query(
-          func.avg(AnalysisHistory.confidence_score)
+            func.avg(AnalysisHistory.confidence_score)
         ).scalar() or 0
         
         total_risks = db.query(
@@ -427,7 +423,6 @@ async def get_stats(db: Session = Depends(get_db)):
         return {"status": "error", "error": str(e)}
 
 # ==================== PDF GENERATION ENDPOINT ====================
-
 @app.get("/api/generate-pdf/{analysis_id}")
 async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
     """Генерация PDF отчёта"""
@@ -440,17 +435,12 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404, "Analysis not found")
     
     # Регистрируем шрифт с поддержкой кириллицы
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    
     try:
-        # Пробуем зарегистрировать шрифт DejaVu Sans (есть в Linux)
         pdfmetrics.registerFont(TTFont('DejaVuSans', '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf'))
         pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf'))
         main_font = 'DejaVuSans'
         bold_font = 'DejaVuSans-Bold'
     except:
-        # Если шрифт не найден, используем стандартный (кириллица не будет работать)
         main_font = 'Helvetica'
         bold_font = 'Helvetica-Bold'
     
@@ -462,7 +452,7 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
     
     # Заголовок
     p.setFont(bold_font, 24)
-    p.drawString(100, y_position, "DocuBot AI - Analysis Report")
+    p.drawString(50, y_position, "DocuBot AI - Analysis Report")
     y_position -= 50
     
     # Основная информация
@@ -471,11 +461,18 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
     y_position -= 30
     
     p.setFont(main_font, 11)
-    full_result = analysis.full_result if isinstance(analysis.full_result, dict) else json.loads(analysis.full_result)
+    
+    # 🔧 Правильно парсим full_result из БД
+    if isinstance(analysis.full_result, str):
+        full_result = json.loads(analysis.full_result)
+    else:
+        full_result = analysis.full_result
+    
     extracted_data = full_result.get('extracted_data', {})
     
     p.drawString(50, y_position, f"Тип документа: {extracted_data.get('document_type', 'N/A')}")
     y_position -= 20
+    
     parties = extracted_data.get('parties', [])
     if isinstance(parties, list):
         parties_str = ', '.join(parties) if parties else 'N/A'
@@ -483,6 +480,7 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db)):
         parties_str = str(parties)
     p.drawString(50, y_position, f"Стороны: {parties_str}")
     y_position -= 20
+    
     p.drawString(50, y_position, f"Сумма: {extracted_data.get('total_amount', 'N/A')} {extracted_data.get('currency', '')}")
     y_position -= 50
     

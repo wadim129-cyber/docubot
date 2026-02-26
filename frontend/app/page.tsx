@@ -14,12 +14,15 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  // 🔧 Добавлено: храним ID текущего анализа для PDF
+  const [currentAnalysisId, setCurrentAnalysisId] = useState<number | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFile(e.target.files[0]);
       setResult(null);
       setError(null);
+      setCurrentAnalysisId(null); // Сбрасываем ID при новом файле
     }
   };
 
@@ -41,6 +44,19 @@ export default function Home() {
       });
 
       setResult(response.data);
+      
+      // 🔧 Сохраняем ID текущего анализа для PDF
+      if (response.data.status === 'success') {
+        try {
+          const historyResponse = await fetch(`${API_URL}/api/history?limit=1`);
+          const historyData = await historyResponse.json();
+          if (historyData.analyses?.length > 0) {
+            setCurrentAnalysisId(historyData.analyses[0].id);
+          }
+        } catch (e) {
+          console.warn('Could not fetch analysis ID:', e);
+        }
+      }
     } catch (err: any) {
       setError(err.response?.data?.error || t('analysisError'));
     } finally {
@@ -49,33 +65,34 @@ export default function Home() {
   };
 
   const handleExportPDF = async () => {
+    // 🔧 Используем сохранённый ID вместо запроса к базе
+    const analysisId = currentAnalysisId;
+    
+    if (!analysisId) {
+      alert('❌ No analysis available. Please upload a document first.');
+      return;
+    }
+    
     const btn = document.querySelector('.export-btn') as HTMLButtonElement;
     const originalText = btn.innerHTML;
     btn.innerHTML = '⏳ Generating PDF...';
     btn.disabled = true;
     
     try {
-      const historyResponse = await fetch(`${API_URL}/api/history?limit=1`);
-      const historyData = await historyResponse.json();
+      const response = await fetch(`${API_URL}/api/generate-pdf/${analysisId}`);
       
-      if (historyData.analyses?.length > 0) {
-        const latestId = historyData.analyses[0].id;
-        const response = await fetch(`${API_URL}/api/generate-pdf/${latestId}`);
-        
-        if (!response.ok) throw new Error('Failed to generate PDF');
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `docubot-analysis-${Date.now()}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      } else {
-        throw new Error('No analysis found');
-      }
+      if (!response.ok) throw new Error('Failed to generate PDF');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      // 🔧 Уникальное имя файла с ID анализа
+      link.download = `docubot-analysis-${analysisId}-${Date.now()}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('PDF error:', error);
       alert('❌ Error creating PDF. Please try again.');
@@ -88,13 +105,13 @@ export default function Home() {
   return (
     <div className="App">
       {/* Language Switcher */}
-       <header className="App-header">
-         <div className="header-content">
+      <header className="App-header">
+        <div className="header-content">
           <h1>🤖 {t('title')}</h1>
           <p>{t('subtitle')}</p>
-         </div>
-         <LanguageSwitcher />
-       </header>
+        </div>
+        <LanguageSwitcher />
+      </header>
 
       {/* Main Content */}
       <main className="main-content">
@@ -259,6 +276,13 @@ export default function Home() {
           text-align: center;
           background: rgba(255, 255, 255, 0.05);
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+        .header-content {
+          flex: 1;
+          text-align: center;
         }
         .App-header h1 {
           margin: 0;
@@ -470,7 +494,8 @@ export default function Home() {
         @media (max-width: 768px) {
           .steps { flex-direction: column; align-items: center; }
           .benefits-grid { grid-template-columns: 1fr; }
-          .App-header h1 { font-size: 2em; }
+          .App-header { flex-direction: column; gap: 15px; padding: 30px 20px 20px !important; }
+          .App-header h1 { font-size: 1.8em !important; margin: 0 !important; }
           .export-btn { width: 100%; max-width: 300px; }
           .results { font-size: 14px; }
           .result-card { padding: 15px; }
@@ -485,49 +510,8 @@ export default function Home() {
           .App-header, .upload-section, .how-it-works, .benefits, .faq, .footer, .export-section { display: none !important; }
           .results { display: block !important; background: white !important; color: black !important; padding: 20px; }
           .result-card { background: white !important; border: 1px solid #ddd !important; page-break-inside: avoid; }
-        
-                  /* 🔧 Мобильная версия - переключатель языков */
-        @media (max-width: 768px) {
-          .App-header {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            padding: 30px 20px 20px !important;
-          }
-          
-          .App-header h1 {
-            font-size: 1.8em !important;
-            margin: 0 !important;
-          }
-          
-          .language-switcher {
-            position: static !important;
-            margin: 0 !important;
-            transform: scale(0.9) !important;
-          }
+          body { background: white !important; }
         }
-        
-        @media print {
-          .App-header, .upload-section, .how-it-works, .benefits, .faq, .footer, .export-section { 
-            display: none !important; 
-          }
-          .results { 
-            display: block !important; 
-            background: white !important; 
-            color: black !important; 
-            padding: 20px; 
-          }
-          .result-card { 
-            background: white !important; 
-            border: 1px solid #ddd !important; 
-            page-break-inside: avoid; 
-          }
-          body { 
-            background: white !important; 
-          }
-        }
-          
       `}</style>
     </div>
   );
