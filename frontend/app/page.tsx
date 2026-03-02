@@ -277,12 +277,14 @@ export default function Home() {
           background: rgba(255, 255, 255, 0.05);
           border-bottom: 1px solid rgba(255, 255, 255, 0.1);
           display: flex;
-          justify-content: space-between;
+          flex-direction: column;
           align-items: center;
+          gap: 15px;
+          position: relative;
         }
         .header-content {
-          flex: 1;
           text-align: center;
+          width: 100%;
         }
         .App-header h1 {
           margin: 0;
