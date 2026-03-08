@@ -12,3 +12,6 @@ requests==2.31.0
 python-telegram-bot==21.0
 cryptography==42.0.0
 reportlab==4.0.9
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+email-validator==2.1.0

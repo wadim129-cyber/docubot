@@ -1,29 +1,22 @@
 'use client';
-
 import { useLanguage } from '../context/LanguageContext';
 
 export default function LanguageSwitcher() {
   const { language, setLanguage } = useLanguage();
 
   return (
-    <div 
-      className="language-switcher"
-      style={{ 
-        display: 'flex', 
-        gap: '10px', 
-        padding: '10px' 
-      }}
-    >
+    <div style={{ display: 'flex', gap: '5px' }}>
       <button
         onClick={() => setLanguage('ru')}
         style={{
-          padding: '8px 16px',
-          background: language === 'ru' ? '#0d9488' : '#334155',
+          padding: '8px 12px',
+          background: language === 'ru' ? '#0d9488' : '#2d3748',
           color: 'white',
           border: 'none',
           borderRadius: '6px',
           cursor: 'pointer',
-          fontWeight: language === 'ru' ? 'bold' : 'normal'
+          fontWeight: 'bold',
+          transition: 'all 0.2s'
         }}
       >
         RU
@@ -31,13 +24,14 @@ export default function LanguageSwitcher() {
       <button
         onClick={() => setLanguage('en')}
         style={{
-          padding: '8px 16px',
-          background: language === 'en' ? '#0d9488' : '#334155',
+          padding: '8px 12px',
+          background: language === 'en' ? '#0d9488' : '#2d3748',
           color: 'white',
           border: 'none',
           borderRadius: '6px',
           cursor: 'pointer',
-          fontWeight: language === 'en' ? 'bold' : 'normal'
+          fontWeight: 'bold',
+          transition: 'all 0.2s'
         }}
       >
         EN
