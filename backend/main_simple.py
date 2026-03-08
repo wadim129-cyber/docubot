@@ -104,18 +104,27 @@ class YandexGPTService:
         self.token_expires_at = 0
         
         # 🔧 ПРИОРИТЕТ: Загружаем из файла, а не из ENV
-        key_file = 'authorized_key.json'
-        if os.path.exists(key_file):
-            with open(key_file, 'r', encoding='utf-8') as f:
-                self.key_data = json.load(f)
-            logger.info(f"✅ Ключ загружен из файла {key_file}")
-        elif key_path and os.path.exists(key_path):
-            with open(key_path, 'r', encoding='utf-8') as f:
-                self.key_data = json.load(f)
-            logger.info(f"✅ Ключ загружен из файла {key_path}")
-        else:
-            # Фолбэк: из ENV (с исправлением \n)
-            key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
+   # 🔧 ПРИОРИТЕТ: Загружаем из переменной окружения (для Railway)
+key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
+if key_content:
+    self.key_data = json.loads(key_content)
+    # 🔧 Исправляем \n в private_key если они как текст
+    if 'private_key' in self.key_data:
+        pk = self.key_data['private_key']
+        if '\\n' in pk:
+            self.key_data['private_key'] = pk.replace('\\n', '\n')
+    logger.info("✅ Ключ загружен из переменной окружения")
+# 🔧 Локально: загружаем из файла (только если это файл, а не папка!)
+elif os.path.isfile('authorized_key.json'):
+    with open('authorized_key.json', 'r', encoding='utf-8') as f:
+        self.key_data = json.load(f)
+    logger.info("✅ Ключ загружен из файла authorized_key.json")
+elif key_path and os.path.isfile(key_path):
+    with open(key_path, 'r', encoding='utf-8') as f:
+        self.key_data = json.load(f)
+    logger.info(f"✅ Ключ загружен из файла {key_path}")
+else:
+    raise RuntimeError("❌ Не найден ключ Yandex GPT! Установите AUTHORIZED_KEY_CONTENT")
             if key_content:
                 self.key_data = json.loads(key_content)
                 # 🔧 Исправляем \n в private_key если они как текст
