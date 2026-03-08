@@ -17,6 +17,7 @@ export default function Auth({ onLogin, onClose }: AuthProps) {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
