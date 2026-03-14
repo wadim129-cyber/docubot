@@ -218,17 +218,50 @@ export default function Home() {
               <h3>📋 {t('basicInfo') || 'Основная информация'}</h3>
               <p><strong>{t('type') || 'Тип'}: </strong> {result.result?.extracted_data?.document_type || '—'}</p>
               <p><strong>{t('subtype') || 'Подтип'}: </strong> {result.result?.extracted_data?.document_subtype || '—'}</p>
-              <p><strong>{t('parties') || 'Стороны'}: </strong> {result.result?.extracted_data?.parties?.join(', ') || '—'}</p>
-              <p><strong>{t('amount') || 'Сумма'}: </strong> {result.result?.extracted_data?.total_amount ? `${result.result.extracted_data.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.currency || 'RUB'}` : (t('notSpecified') || 'Не указана')}</p>
+              <p><strong>{t('parties') || 'Стороны'}: </strong> 
+                {result.result?.extracted_data?.parties?.map((p: any, i: number) => (
+                  <span key={i}>{p.name}{p.role && ` (${p.role})`}{i < (result.result?.extracted_data?.parties?.length || 0) - 1 ? ', ' : ''}</span>
+                )) || '—'}
+              </p>
+              <p><strong>{t('amount') || 'Сумма'}: </strong> 
+                {result.result?.extracted_data?.financial_terms?.total_amount 
+                  ? `${result.result.extracted_data.financial_terms.total_amount.toLocaleString('ru-RU')} ${result.result.extracted_data.financial_terms.currency || 'RUB'}` 
+                  : (t('notSpecified') || 'Не указана')}
+              </p>
             </div>
+
+            {/* Даты */}
+            {result.result?.extracted_data?.dates && Object.values(result.result.extracted_data.dates).some(v => v) && (
+              <div className="result-card">
+                <h3>📅 Даты</h3>
+                {result.result.extracted_data.dates.signature && <p><strong>Подпись:</strong> {result.result.extracted_data.dates.signature}</p>}
+                {result.result.extracted_data.dates.start_date && <p><strong>Начало:</strong> {result.result.extracted_data.dates.start_date}</p>}
+                {result.result.extracted_data.dates.end_date && <p><strong>Окончание:</strong> {result.result.extracted_data.dates.end_date}</p>}
+                {result.result.extracted_data.dates.payment_due && <p><strong>Оплата до:</strong> {result.result.extracted_data.dates.payment_due}</p>}
+              </div>
+            )}
+
+            {/* Недостающие реквизиты */}
+            {result.result?.extracted_data?.missing_requisites && result.result.extracted_data.missing_requisites.length > 0 && (
+              <div className="result-card">
+                <h3>⚠️ Недостающие реквизиты</h3>
+                <ul style={{ color: '#ffa500' }}>
+                  {result.result.extracted_data.missing_requisites.map((req: string, i: number) => (
+                    <li key={i}>{req}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
 
             <div className="result-card">
               <h3>⚠️ {t('risks') || 'Риски'} ({result.result?.risk_flags?.length || 0})</h3>
               {result.result?.risk_flags?.map((flag: any, index: number) => (
                 <div key={index} className={`risk-flag risk-${flag.level}`}>
+                  {flag.title && <strong className="block mb-1">{flag.title}</strong>}
                   <strong>{flag.level?.toUpperCase()} - {flag.category}</strong>
                   <p>{flag.description}</p>
-                  <em>💡 {flag.suggestion}</em>
+                  {flag.suggestion && <em>💡 {flag.suggestion}</em>}
+                  {flag.impact && <p className="text-xs text-red-300 mt-1">⚠️ {flag.impact}</p>}
                 </div>
               ))}
             </div>
@@ -236,8 +269,18 @@ export default function Home() {
             <div className="result-card">
               <h3>✅ {t('recommendations') || 'Рекомендации'}</h3>
               <ul>
-                {result.result?.action_items?.map((item: string, index: number) => (
-                  <li key={index}>{item}</li>
+                {result.result?.action_items?.map((item: any, index: number) => (
+                  <li key={index} style={{ marginBottom: '10px' }}>
+                    {item.priority && (
+                      <span className={`inline-block px-2 py-1 rounded text-xs font-bold mr-2 ${
+                        item.priority === 'high' ? 'bg-red-600' : item.priority === 'medium' ? 'bg-yellow-600' : 'bg-blue-600'
+                      }`}>
+                        {item.priority === 'high' ? '🔴' : item.priority === 'medium' ? '🟡' : '🔵'} {item.priority}
+                      </span>
+                    )}
+                    {item.action}
+                    {item.deadline && <span className="text-gray-500 text-sm ml-2">⏰ {item.deadline}</span>}
+                  </li>
                 ))}
               </ul>
             </div>
@@ -246,6 +289,7 @@ export default function Home() {
               <h3>📝 {t('summary') || 'Резюме'}</h3>
               <p>{result.result?.summary || '—'}</p>
               <p><strong>{t('confidence') || 'Точность'}: </strong> {result.result?.confidence_score ? (result.result.confidence_score * 100).toFixed(0) + '%' : '—'}</p>
+              {result.result?.analysis_notes && <p className="text-gray-400 text-sm mt-2">📌 {result.result.analysis_notes}</p>}
             </div>
 
             <div className="export-section">
