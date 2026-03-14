@@ -72,11 +72,11 @@ class RiskLevel(str, Enum):
 class RiskFlag(BaseModel):
     level: RiskLevel
     category: str
-    title: str  # ✅ Добавили заголовок
+    title: Optional[str] = None  # ✅ Теперь необязательное!
     description: str
-    legal_basis: Optional[str] = None  # ✅ Добавили основание
+    legal_basis: Optional[str] = None
     suggestion: str
-    impact: Optional[str] = None  # ✅ Добавили последствия
+    impact: Optional[str] = None
 
 class Party(BaseModel):
     name: str
@@ -115,7 +115,7 @@ class ExtractedData(BaseModel):
     missing_requisites: List[str] = Field(default_factory=list)
 
 class ActionItem(BaseModel):
-    priority: str = "medium"
+    priority: Optional[str] = "medium"  # ✅ Optional
     action: str
     deadline: Optional[str] = None
 
