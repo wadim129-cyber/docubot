@@ -72,24 +72,60 @@ class RiskLevel(str, Enum):
 class RiskFlag(BaseModel):
     level: RiskLevel
     category: str
+    title: str  # ✅ Добавили заголовок
     description: str
+    legal_basis: Optional[str] = None  # ✅ Добавили основание
     suggestion: str
+    impact: Optional[str] = None  # ✅ Добавили последствия
+
+class Party(BaseModel):
+    name: str
+    role: str = "other"
+    inn: Optional[str] = None
+    address: Optional[str] = None
+
+class FinancialTerms(BaseModel):
+    total_amount: Optional[float] = None
+    currency: str = "RUB"
+    interest_rate: Optional[str] = None
+    interest_rate_numeric: Optional[float] = None
+    payment_schedule: Optional[str] = None
+    loan_term_days: Optional[int] = None
+    late_fee_percent: Optional[float] = None
+    late_fee_description: Optional[str] = None
+
+class DatesData(BaseModel):
+    signature: Optional[str] = None
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    payment_due: Optional[str] = None
 
 class ExtractedData(BaseModel):
     document_type: DocumentType
-    parties: List[str] = Field(default_factory=list)
-    total_amount: Optional[float] = None
-    currency: Optional[str] = "RUB"
-    dates: Dict[str, Optional[str]] = Field(default_factory=dict)
+    document_subtype: str = "other"
+    document_number: Optional[str] = None
+    document_date: Optional[str] = None
+    parties: List[Party] = Field(default_factory=list)  # ✅ Теперь список объектов!
+    financial_terms: FinancialTerms = Field(default_factory=FinancialTerms)
+    dates: DatesData = Field(default_factory=DatesData)
     obligations: List[str] = Field(default_factory=list)
     penalties: Optional[str] = None
+    termination_conditions: Optional[str] = None
+    dispute_resolution: Optional[str] = None
+    missing_requisites: List[str] = Field(default_factory=list)
+
+class ActionItem(BaseModel):
+    priority: str = "medium"
+    action: str
+    deadline: Optional[str] = None
 
 class AnalysisResult(BaseModel):
     extracted_data: ExtractedData
     risk_flags: List[RiskFlag] = Field(default_factory=list)
-    action_items: List[str] = Field(default_factory=list)
+    action_items: List[ActionItem] = Field(default_factory=list)  # ✅ Теперь объекты!
     summary: str
     confidence_score: float = Field(ge=0, le=1)
+    analysis_notes: Optional[str] = None  # ✅ Добавили заметки
 
 class DocumentUploadResponse(BaseModel):
     status: str
