@@ -6,9 +6,9 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import Auth from '../components/Auth';
 
 // 🔧 Production URL
+const API_URL = 'https://docubot-production-043f.up.railway.app';
 // const API_URL = 'http://localhost:10000';
 // const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:10000';
-const API_URL = 'https://docubot-production-043f.up.railway.app';
 
 export default function Home() {
   const { t } = useLanguage();
