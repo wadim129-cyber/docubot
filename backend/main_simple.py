@@ -202,31 +202,97 @@ class DocumentAgent:
             return _analysis_cache[text_hash]
         
         combined_prompt = f"""
-Ты — эксперт по анализу юридических документов. Определи тип документа и извлеки ВСЕ доступные данные. Верни ТОЛЬКО валидный JSON.
+combined_prompt = f"""
+Ты — профессиональный юрист-эксперт с 15-летним стажем по анализу юридических документов. 
+Твоя задача — найти ВСЕ риски и извлечь ВСЕ данные для защиты интересов пользователя.
 
 📄 ТЕКСТ ДОКУМЕНТА:
-{text[:4000]}
+{text[:4500]}
 
-📋 ФОРМАТ ОТВЕТА (строго JSON):
+⚖️ ИНСТРУКЦИЯ ПО АНАЛИЗУ:
+
+1. **Определи тип документа** максимально точно
+2. **Извлеки ВСЕ числовые данные** (суммы, даты, проценты)
+3. **Найди ВСЕ риски** — даже скрытые и косвенные
+4. **Проверь обязательные реквизиты** для этого типа документа
+5. **Оцени защитённость слабой стороны** (заёмщик, арендатор, исполнитель)
+
+📋 ФОРМАТ ОТВЕТА (строго валидный JSON без markdown):
+
 {{
   "extracted_data": {{
-    "document_type": "contract|invoice|act|application|other",
-    "document_subtype": "loan|rental|service|purchase|microloan_application|other",
-    "parties": ["Сторона 1", "Сторона 2"],
-    "total_amount": 5800,
-    "currency": "RUB",
-    "dates": {{"signature": "2024-01-01"}},
-    "financial_terms": {{"interest_rate": "0.8% в день", "loan_term": "30 дней"}},
-    "obligations": ["обязательство 1"],
-    "penalties": "описание штрафов"
+    "document_type": "contract|invoice|act|application|agreement|certificate|other",
+    "document_subtype": "loan|microloan|rental|service|purchase|employment|lease|other",
+    "document_number": "номер документа или null",
+    "document_date": "YYYY-MM-DD или null",
+    "parties": [
+      {{"name": "Полное название стороны 1", "role": "заёмщик|кредитор|арендодатель|арендатор|исполнитель|заказчик|other", "inn": "ИНН или null", "address": "адрес или null"}}
+    ],
+    "financial_terms": {{
+      "total_amount": число или null,
+      "currency": "RUB|USD|EUR|other",
+      "interest_rate": "процентная ставка текстом",
+      "interest_rate_numeric": число (годовых) или null,
+      "payment_schedule": "график платежей или null",
+      "loan_term_days": число дней или null,
+      "late_fee_percent": процент пени или null,
+      "late_fee_description": "описание пени текстом"
+    }},
+    "dates": {{
+      "signature": "YYYY-MM-DD или null",
+      "start_date": "YYYY-MM-DD или null",
+      "end_date": "YYYY-MM-DD или null",
+      "payment_due": "YYYY-MM-DD или null"
+    }},
+    "obligations": ["конкретное обязательство 1", "конкретное обязательство 2"],
+    "penalties": "полное описание штрафов и пени",
+    "termination_conditions": "условия расторжения или null",
+    "dispute_resolution": "порядок разрешения споров или null",
+    "missing_requisites": ["отсутствующий реквизит 1", "отсутствующий реквизит 2"]
   }},
   "risk_flags": [
-    {{"level": "high|medium|low", "category": "financial|legal|operational", "description": "...", "suggestion": "..."}}
+    {{
+      "level": "critical|high|medium|low",
+      "category": "financial|legal|operational|compliance|reputation",
+      "title": "Короткий заголовок риска",
+      "description": "Подробное описание риска с цитатой из документа",
+      "legal_basis": "ссылка на закон/статью или null",
+      "suggestion": "Конкретное действие для минимизации риска",
+      "impact": "Что будет если игнорировать"
+    }}
   ],
-  "action_items": ["действие 1", "действие 2"],
-  "summary": "Краткое резюме 2-3 предложения",
-  "confidence_score": 0.85
+  "action_items": [
+    {{"priority": "high|medium|low", "action": "Конкретное действие", "deadline": "рекомендуемый срок"}}
+  ],
+  "summary": "Профессиональное резюме на 3-4 предложения с выводами о надёжности документа",
+  "confidence_score": число от 0.0 до 1.0,
+  "analysis_notes": "Дополнительные заметки эксперта о документе"
 }}
+
+🔍 ОБЯЗАТЕЛЬНЫЕ ПРОВЕРКИ НА РИСКИ:
+
+**Для займов/кредитов:**
+- Проверь ставку на соответствие ГК РФ (ст. 395, 809)
+- Найди скрытые комиссии
+- Проверь расчёт полной стоимости кредита (ПСК)
+- Проверь законность пени (не более 0.1% в день по ст. 395 ГК)
+
+**Для договоров:**
+- Проверь существенные условия (предмет, цена, срок)
+- Найди односторонние преимущества
+- Проверь условия расторжения
+
+**Для всех документов:**
+- Отсутствуют обязательные реквизиты?
+- Есть двусмысленные формулировки?
+- Нарушаются права слабой стороны?
+- Есть условия о подсудности в неудобном городе?
+
+⚠️ ВАЖНО:
+- Если данных недостаточно — ставь null, не выдумывай
+- confidence_score < 0.5 если документ плохо читаем
+- level: "critical" если есть риск потери денег или суда
+- Возвращай ТОЛЬКО JSON, без текста до и после
 """
         response = self.gpt.call_gpt(combined_prompt, max_tokens=1200)
         
