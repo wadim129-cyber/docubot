@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const API_URL = 'http://localhost:10000';
+const API_URL = 'https://docubot-production-043f.up.railway.app';
 
 export default function Auth({ onLogin }) {
   const [isLogin, setIsLogin] = useState(true);
