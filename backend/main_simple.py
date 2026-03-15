@@ -19,9 +19,8 @@ from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-# main_simple.py - начало файла
-from database import get_db, AnalysisHistory, init_db, User  # ✅ Добавили User
-from sqlalchemy import desc, func  # ✅ Добавили func если нет
+from database import get_db, AnalysisHistory, init_db, User
+from sqlalchemy import desc, func
 
 from auth import (
     UserCreate, UserLogin, Token, UserResponse,
@@ -69,11 +68,12 @@ class RiskLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+    CRITICAL = "critical"  # ✅ ДОБАВЛЕНО
 
 class RiskFlag(BaseModel):
     level: RiskLevel
     category: str
-    title: Optional[str] = None  # ✅ Теперь необязательное!
+    title: Optional[str] = None
     description: str
     legal_basis: Optional[str] = None
     suggestion: str
@@ -106,7 +106,7 @@ class ExtractedData(BaseModel):
     document_subtype: str = "other"
     document_number: Optional[str] = None
     document_date: Optional[str] = None
-    parties: List[Party] = Field(default_factory=list)  # ✅ Теперь список объектов!
+    parties: List[Party] = Field(default_factory=list)
     financial_terms: FinancialTerms = Field(default_factory=FinancialTerms)
     dates: DatesData = Field(default_factory=DatesData)
     obligations: List[str] = Field(default_factory=list)
@@ -116,17 +116,17 @@ class ExtractedData(BaseModel):
     missing_requisites: List[str] = Field(default_factory=list)
 
 class ActionItem(BaseModel):
-    priority: Optional[str] = "medium"  # ✅ Optional
+    priority: Optional[str] = "medium"
     action: str
     deadline: Optional[str] = None
 
 class AnalysisResult(BaseModel):
     extracted_data: ExtractedData
     risk_flags: List[RiskFlag] = Field(default_factory=list)
-    action_items: List[ActionItem] = Field(default_factory=list)  # ✅ Теперь объекты!
+    action_items: List[ActionItem] = Field(default_factory=list)
     summary: str
     confidence_score: float = Field(ge=0, le=1)
-    analysis_notes: Optional[str] = None  # ✅ Добавили заметки
+    analysis_notes: Optional[str] = None
 
 class DocumentUploadResponse(BaseModel):
     status: str
@@ -339,35 +339,105 @@ class DocumentAgent:
         except Exception as e:
             logger.warning(f"JSON parse error: {e}")
             data = {
-                "extracted_data": {"document_type": "other", "parties": [], "total_amount": None, "currency": "Не указана", "dates": {}, "obligations": [], "penalties": None},
+                "extracted_data": {"document_type": "other", "parties": [], "financial_terms": {}, "dates": {}, "obligations": [], "penalties": None},
                 "risk_flags": [],
                 "action_items": ["Проверить документ вручную"],
                 "summary": "Не удалось проанализировать документ",
                 "confidence_score": 0.3
             }
         
+        # ✅ ИСПРАВЛЕНА СБОРКА ОБЪЕКТА
         ext = data.get("extracted_data", {})
+        financial_raw = ext.get("financial_terms", {}) or {}
+        dates_raw = ext.get("dates", {}) or {}
+        parties_raw = ext.get("parties") or []
+        
+        # Безопасное создание parties
+        parties_list = []
+        for p in parties_raw:
+            if isinstance(p, dict):
+                try:
+                    parties_list.append(Party(**p))
+                except Exception as e:
+                    logger.warning(f"Error parsing party: {e}")
+                    parties_list.append(Party(name=str(p.get("name", "Unknown")), role=p.get("role", "other")))
+            else:
+                parties_list.append(Party(name=str(p), role="other"))
+        
+        # Безопасное создание risk_flags
+        risk_flags_list = []
+        for f in (data.get("risk_flags") or []):
+            try:
+                level_str = f.get("level", "low").lower()
+                # ✅ Преобразуем уровень риска в Enum
+                if level_str not in ["low", "medium", "high", "critical"]:
+                    level_str = "low"
+                risk_flags_list.append(RiskFlag(
+                    level=RiskLevel(level_str),
+                    category=f.get("category", "other"),
+                    title=f.get("title"),
+                    description=f.get("description", ""),
+                    legal_basis=f.get("legal_basis"),
+                    suggestion=f.get("suggestion", ""),
+                    impact=f.get("impact")
+                ))
+            except Exception as e:
+                logger.warning(f"Error parsing risk flag: {e}")
+        
+        # Безопасное создание action_items
+        action_items_list = []
+        for a in (data.get("action_items") or []):
+            if isinstance(a, dict):
+                try:
+                    action_items_list.append(ActionItem(**a))
+                except Exception as e:
+                    logger.warning(f"Error parsing action item: {e}")
+                    action_items_list.append(ActionItem(action=str(a.get("action", "Check manually"))))
+            else:
+                action_items_list.append(ActionItem(action=str(a)))
+        
         result = AnalysisResult(
             extracted_data=ExtractedData(
                 document_type=DocumentType(ext.get("document_type", "other")),
-                parties=ext.get("parties") or [],
-                total_amount=ext.get("total_amount"),
-                currency=ext.get("currency") or "Не указана",
-                dates=ext.get("dates") or {},
+                document_subtype=ext.get("document_subtype", "other"),
+                document_number=ext.get("document_number"),
+                document_date=ext.get("document_date"),
+                parties=parties_list,
+                financial_terms=FinancialTerms(
+                    total_amount=financial_raw.get("total_amount"),
+                    currency=financial_raw.get("currency", "RUB"),
+                    interest_rate=financial_raw.get("interest_rate"),
+                    interest_rate_numeric=financial_raw.get("interest_rate_numeric"),
+                    payment_schedule=financial_raw.get("payment_schedule"),
+                    loan_term_days=financial_raw.get("loan_term_days"),
+                    late_fee_percent=financial_raw.get("late_fee_percent"),
+                    late_fee_description=financial_raw.get("late_fee_description"),
+                ),
+                dates=DatesData(
+                    signature=dates_raw.get("signature"),
+                    start_date=dates_raw.get("start_date"),
+                    end_date=dates_raw.get("end_date"),
+                    payment_due=dates_raw.get("payment_due"),
+                ),
                 obligations=ext.get("obligations") or [],
-                penalties=ext.get("penalties")
+                penalties=ext.get("penalties"),
+                termination_conditions=ext.get("termination_conditions"),
+                dispute_resolution=ext.get("dispute_resolution"),
+                missing_requisites=ext.get("missing_requisites", []),
             ),
-            risk_flags=[RiskFlag(level=RiskLevel(f.get("level", "low")), category=f.get("category", "other"), description=f.get("description", ""), suggestion=f.get("suggestion", "")) for f in (data.get("risk_flags") or [])],
-            action_items=data.get("action_items") or ["Проверить вручную"],
-            summary=data.get("summary", ""),
-            confidence_score=min(1.0, max(0.0, data.get("confidence_score", 0.5)))
+            risk_flags=risk_flags_list,
+            action_items=action_items_list,
+            summary=data.get("summary", "Анализ завершён"),
+            confidence_score=min(1.0, max(0.0, data.get("confidence_score", 0.5))),
+            analysis_notes=data.get("analysis_notes")
         )
+        
         _analysis_cache[text_hash] = result
         logger.info(f"💾 Результат сохранён в кэш (всего: {len(_analysis_cache)})")
         return result
 
 # ==================== FASTAPI APP ====================
-app = FastAPI(title="DocuBot API", description="AI-агент для анализа документов", version="0.3.0")
+app = FastAPI(title="DocuBot API", description="AI-агент для анализа документов", version="0.3.1")
 
 app.add_middleware(
     CORSMiddleware,
@@ -388,7 +458,7 @@ agent = DocumentAgent(gpt_service)
 # ==================== PUBLIC ENDPOINTS ====================
 @app.get("/")
 async def root():
-    return {"message": "DocuBot API работает!", "version": "0.3.0"}
+    return {"message": "DocuBot API работает!", "version": "0.3.1"}
 
 @app.get("/health")
 async def health_check():
@@ -399,40 +469,6 @@ async def cache_stats():
     return {"cache_size": len(_analysis_cache), "cache_info": get_text_hash.cache_info()}
 
 # ==================== AUTH ENDPOINTS ====================
-@app.post("/auth/register", response_model=UserResponse)
-async def register(user: UserCreate, db: Session = Depends(get_db)):
-    db_user = get_user(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
-    new_user = create_user(db=db, user=user)
-    logger.info(f"✅ Новый пользователь: {new_user.email}")
-    return new_user
-
-@app.post("/auth/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    user = get_user(db, email=form_data.username)
-    if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный email или пароль",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    logger.info(f"✅ Вход: {user.email}")
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "email": user.email
-    }
-
-@app.get("/auth/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    return current_user
-    # ==================== AUTH ENDPOINTS ====================
 @app.post("/auth/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
     """Регистрация нового пользователя"""
