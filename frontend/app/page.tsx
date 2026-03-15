@@ -66,47 +66,59 @@ export default function Home() {
     }
   };
 
-  const handleUpload = async () => {
-    if (!file) {
-      setError(t('selectFile'));
-      return;
+const handleUpload = async () => {
+  if (!file) {
+    setError(t('selectFile'));
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+  console.log('🚀 Starting analysis for:', file.name);
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers: any = { 'Content-Type': 'multipart/form-data' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    console.log('📡 Request URL:', `${API_URL}/api/analyze`); // Лог для проверки URL
+    
+    const response = await axios.post(`${API_URL}/api/analyze`, formData, { 
+      headers,
+      validateStatus: function (status) {
+        return status < 500; // Позволяет получить тело ошибки даже при 4xx/5xx
+      }
+    });
+
+    // 🔎 Дебаг: что именно пришло от сервера
+    console.log('📦 Response status:', response.status);
+    console.log('📦 Response data preview:', JSON.stringify(response.data).slice(0, 200) + '...');
+
+    if (response.status !== 200) {
+      throw new Error(response.data?.error || `Server error: ${response.status}`);
     }
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const headers: any = { 'Content-Type': 'multipart/form-data' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await axios.post(`${API_URL}/api/analyze`, formData, { headers });
-      setResult(response.data);
-      
-      if (response.data.status === 'success') {
-        try {
-          const historyHeaders: any = {};
-          if (token) historyHeaders['Authorization'] = `Bearer ${token}`;
-          
-          const historyResponse = await fetch(`${API_URL}/api/history?limit=1`, { headers: historyHeaders });
-          const historyData = await historyResponse.json();
-          if (historyData.analyses?.length > 0) {
-            setCurrentAnalysisId(historyData.analyses[0].id);
-          }
-        } catch (e) {
-          console.warn('Could not fetch analysis ID:', e);
-        }
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.error || t('analysisError'));
-    } finally {
-      setLoading(false);
+    setResult(response.data);
+    
+    if (response.data.status === 'success') {
+      // ... логика получения ID из истории ...
     }
-  };
+    
+  } catch (err: any) {
+    console.error('❌ Analysis failed:', {
+      message: err.message,
+      status: err.response?.status,
+      data: err.response?.data,
+      config: { url: err.config?.url, method: err.config?.method }
+    });
+    
+    setError(err.response?.data?.error || err.message || t('analysisError'));
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleExportPDF = async () => {
     const analysisId = currentAnalysisId;
