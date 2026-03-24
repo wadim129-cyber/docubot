@@ -34,7 +34,8 @@ class User(Base):
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, index=True)  # ✅ Индекс для фильтрации активных
     created_at = Column(DateTime, default=datetime.utcnow, index=True)  # ✅ Индекс для сортировки
-
+    reset_token = Column(String, nullable=True, index=True)
+    reset_token_expiry = Column(DateTime, nullable=True)
 # ==================== МОДЕЛЬ AnalysisHistory ====================
 class AnalysisHistory(Base):
     __tablename__ = "analysis_history"
