@@ -69,3 +69,19 @@ PORT=10000
 SECRET_KEY=your_secret_key_here
 DATABASE_URL=sqlite:///./docubot_local.db
 AUTHORIZED_KEY_CONTENT={json с ключом Yandex Cloud}
+
+NEXT_PUBLIC_API_URL=https://docubot-production-043f.up.railway.app
+NEXT_PUBLIC_BACKEND_URL=https://docubot-production-043f.up.railway.app
+API_URL=https://docubot-production-043f.up.railway.app
+
+NEXT_PUBLIC_API_URL=http://localhost:10000
+NEXT_PUBLIC_BACKEND_URL=http://localhost:10000
+
+Frontend: https://docubot-three.vercel.app
+Backend: https://docubot-production-043f.up.railway.app
+GitHub: https://github.com/wadim129-cyber/docubot
+Railway Dashboard: https://railway.app/project/docubot
+
+
+
+

@@ -38,10 +38,10 @@ else:
 # Сохраняем
 key_data['private_key'] = fixed_key
 
-with open('authorized_key_fixed.json', 'w', encoding='utf-8', newline='\n') as f:
-    json.dump(key_data, f, ensure_ascii=False, indent=2, newline='\n')
+# 🔧 Исправлено: убираем newline из json.dump()
+with open('authorized_key_fixed.json', 'w', encoding='utf-8') as f:
+    json.dump(key_data, f, ensure_ascii=False, indent=2)
 
 print("\n✅ Готово!")
-print("1. Проверьте файл authorized_key_fixed.json")
-print("2. Замените authorized_key.json на authorized_key_fixed.json")
-print("3. Перезапустите сервер")
+print("1. Замените authorized_key.json на authorized_key_fixed.json")
+print("2. Перезапустите сервер")

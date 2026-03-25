@@ -41,6 +41,10 @@ from reportlab.pdfbase.ttfonts import TTFont
 # Загрузка .env
 load_dotenv()
 
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+ALLOWED_EXTENSIONS = {".pdf"}
+ALLOWED_MIME_TYPES = {"application/pdf"}
+
 # Логирование
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -515,45 +519,82 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
 # ==================== PROTECTED ENDPOINTS ====================
 @app.post("/api/analyze", response_model=DocumentUploadResponse)
 async def analyze_document(
-    file: UploadFile = File(...),
+    file: UploadFile = File(..., description="PDF файл до 10MB"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     logger.info(f"📁 Анализ от пользователя: {current_user.email}, файл: {file.filename}")
+    
+    # 🔒 ПРОВЕРКА 1: Расширение файла
+    file_ext = os.path.splitext(file.filename.lower())[1]
+    if file_ext not in ALLOWED_EXTENSIONS:
+        logger.warning(f"❌ Запрещённое расширение: {file_ext}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Только PDF файлы. Получено: {file_ext}"
+        )
+    
+    # 🔒 ПРОВЕРКА 2: MIME-type
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        logger.warning(f"❌ Запрещённый MIME-type: {file.content_type}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Неверный тип файла: {file.content_type}"
+        )
+    
     try:
+        # 🔒 ПРОВЕРКА 3: Чтение и размер
         content = await file.read()
-        text = agent.extract_text_from_pdf(content)
-        if not text or len(text) < 10:
-            raise HTTPException(400, "Не удалось извлечь текст")
+        file_size = len(content)
         
+        if file_size == 0:
+            raise HTTPException(400, "Файл пустой")
+        
+        if file_size > MAX_FILE_SIZE:
+            logger.warning(f"❌ Файл слишком большой: {file_size / 1024 / 1024:.2f} MB")
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Файл > 10MB: {file_size / 1024 / 1024:.2f} MB"
+            )
+        
+        logger.info(f"✅ Файл принят: {file.filename}, {file_size / 1024:.1f} KB")
+        
+        # 📄 Извлечение текста
+        text = agent.extract_text_from_pdf(content)
+        if not text or len(text.strip()) < 10:
+            raise HTTPException(400, "Не удалось извлечь текст из PDF")
+        
+        # 🤖 AI анализ
         result = agent.analyze_document(text)
         
+        # 💾 Сохранение в БД (исправлено: JSON для parties + ensure_ascii)
         try:
             history = AnalysisHistory(
                 filename=file.filename,
                 document_type=result.extracted_data.document_type.value,
-                parties=str(result.extracted_data.parties),
-                total_amount=result.extracted_data.total_amount,
-                currency=result.extracted_data.currency,
+                parties=json.dumps([p.model_dump() for p in result.extracted_data.parties], ensure_ascii=False),
+                total_amount=result.extracted_data.financial_terms.total_amount,
+                currency=result.extracted_data.financial_terms.currency,
                 summary=result.summary,
                 confidence_score=result.confidence_score,
                 risk_count=len(result.risk_flags),
-                full_result=json.dumps(result.model_dump()),
+                full_result=json.dumps(result.model_dump(), ensure_ascii=False),
                 user_id=str(current_user.id)
             )
             db.add(history)
             db.commit()
         except Exception as e:
-            logger.error(f"❌ Ошибка сохранения в БД: {e}")
+            logger.error(f"❌ Ошибка БД: {e}")
             db.rollback()
         
         return DocumentUploadResponse(status="success", result=result)
+        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Ошибка: {str(e)}")
+        logger.error(f"❌ Ошибка: {str(e)}")
         return DocumentUploadResponse(status="error", error=str(e))
-
+        
 @app.get("/api/history")
 async def get_history(limit: int = 10, skip: int = 0, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
@@ -655,7 +696,7 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db), current_
     if main_font == 'Helvetica':
         logger.error("❌ Шрифт с кириллицей не найден!")
 
-    # 🔧 ГЕНЕРАЦИЯ PDF
+       # 🔧 ГЕНЕРАЦИЯ PDF
     buffer = BytesIO()
     p = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
@@ -680,10 +721,22 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db), current_
     
     p.drawString(50, y, f"Тип: {ext.get('document_type', 'N/A')}")
     y -= 20
+    
+    # 🔧 ИСПРАВЛЕНИЕ: parties — список словарей, извлекаем имена
     parties = ext.get('parties', [])
-    parties_str = ', '.join(parties) if isinstance(parties, list) and parties else 'N/A'
+    if isinstance(parties, list) and parties:
+        party_names = []
+        for p_item in parties:
+            if isinstance(p_item, dict):
+                party_names.append(p_item.get('name', 'Unknown'))
+            else:
+                party_names.append(str(p_item))
+        parties_str = ', '.join(party_names)
+    else:
+        parties_str = 'N/A'
     p.drawString(50, y, f"Стороны: {parties_str}")
     y -= 20
+    
     p.drawString(50, y, f"Сумма: {ext.get('total_amount', 'N/A')} {ext.get('currency', '')}")
     y -= 50
 
@@ -700,13 +753,15 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db), current_
             p.showPage()
             y = height - 50
 
-    # Рекомендации
+    # 🔧 ИСПРАВЛЕНИЕ: Рекомендации (action_items может быть dict)
     p.setFont(bold_font, 14)
     p.drawString(50, y, "✅ Рекомендации")
     y -= 30
     for i, item in enumerate(full_result.get('action_items', []), 1):
         p.setFont(main_font, 10)
-        p.drawString(50, y, f"{i}. {item}")
+        # Если item — словарь, берём поле 'action', иначе конвертируем в строку
+        action_text = item.get('action', str(item)) if isinstance(item, dict) else str(item)
+        p.drawString(50, y, f"{i}. {action_text}")
         y -= 20
         if y < 100:
             p.showPage()
@@ -741,7 +796,3 @@ async def generate_pdf(analysis_id: int, db: Session = Depends(get_db), current_
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=docubot-analysis-{analysis_id}.pdf"}
     )
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", 10000)))
