@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 import os
 import json
 import time
@@ -28,25 +28,62 @@ from auth import (
     create_access_token, get_current_user,
     ACCESS_TOKEN_EXPIRE_MINUTES
 )
-from datetime import timedelta
-from fastapi import status
-from fastapi.security import OAuth2PasswordRequestForm
 
 # PDF генерация
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
-# Загрузка .env
+# === ПОДДЕРЖКА КИРИЛЛИЦЫ В PDF (ГЛОБАЛЬНО) ===
+def setup_fonts():
+    """Используем Arial (Windows) или DejaVuSans (кроссплатформенный)"""
+    import sys
+    
+    if sys.platform == 'win32':
+        # Windows: используем Arial (есть везде)
+        font_paths = [
+            (os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts', 'arial.ttf'), 'Arial'),
+            (os.path.join(os.environ.get('WINDIR', 'C:\\Windows'), 'Fonts', 'arialbd.ttf'), 'Arial-Bold'),
+        ]
+    else:
+        # Linux/Mac: DejaVuSans
+        font_dir = os.path.join(os.path.dirname(__file__), "fonts")
+        font_paths = [
+            (os.path.join(font_dir, "DejaVuSans.ttf"), "DejaVuSans"),
+            (os.path.join(font_dir, "DejaVuSans-Bold.ttf"), "DejaVuSans-Bold"),
+        ]
+    
+    default_font = "Helvetica"
+    bold_font = "Helvetica-Bold"
+    
+    for font_path, font_name in font_paths:
+        if os.path.exists(font_path):
+            try:
+                pdfmetrics.registerFont(TTFont(font_name, font_path))
+                if 'Bold' in font_name or 'bd' in font_path.lower():
+                    bold_font = font_name
+                else:
+                    default_font = font_name
+                logging.info(f"✅ Шрифт загружен: {font_name} из {font_path}")
+            except Exception as e:
+                logging.warning(f"⚠️ Ошибка загрузки {font_name}: {e}")
+    
+    logging.info(f"📝 Используем шрифты: {default_font}, {bold_font}")
+    return default_font, bold_font
+
+DEFAULT_FONT, BOLD_FONT = setup_fonts()
+
 load_dotenv()
 
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024
 ALLOWED_EXTENSIONS = {".pdf"}
 ALLOWED_MIME_TYPES = {"application/pdf"}
 
-# Логирование
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 # ==================== БАЗА ДАННЫХ ====================
@@ -72,7 +109,7 @@ class RiskLevel(str, Enum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
-    CRITICAL = "critical"  # ✅ ДОБАВЛЕНО
+    CRITICAL = "critical"
 
 class RiskFlag(BaseModel):
     level: RiskLevel
@@ -144,23 +181,20 @@ class YandexGPTService:
         self.iam_token = None
         self.token_expires_at = 0
         
-        # 🔑 Читаем ключ из переменной окружения (приоритет для Railway)
         key_content = os.getenv('AUTHORIZED_KEY_CONTENT')
         if key_content:
             self.key_data = json.loads(key_content)
-            logger.info("✅ Ключ загружен из переменной окружения")
-        # 🔑 Читаем из файла authorized_key.json (локально)
+            logger.info("Ключ загружен из ENV")
         elif os.path.isfile('authorized_key.json'):
             with open('authorized_key.json', 'r', encoding='utf-8') as f:
                 self.key_data = json.load(f)
-            logger.info("✅ Ключ загружен из файла authorized_key.json")
-        # 🔑 Фолбэк: файл по пути (если указан)
+            logger.info("Ключ загружен из файла")
         elif key_path and os.path.isfile(key_path):
             with open(key_path, 'r', encoding='utf-8') as f:
                 self.key_data = json.load(f)
-            logger.info(f"✅ Ключ загружен из файла {key_path}")
+            logger.info(f"Ключ загружен из {key_path}")
         else:
-            raise RuntimeError("❌ Не найден ключ Yandex GPT! Установите AUTHORIZED_KEY_CONTENT")
+            raise RuntimeError("Не найден ключ Yandex GPT!")
         
         self.service_account_id = self.key_data['service_account_id']
         self.private_key = self.key_data['private_key']
@@ -239,100 +273,37 @@ class DocumentAgent:
     def analyze_document(self, text: str) -> AnalysisResult:
         text_hash = get_text_hash(text)
         if text_hash in _analysis_cache:
-            logger.info("✅ Результат взят из кэша")
+            logger.info("Результат из кэша")
             return _analysis_cache[text_hash]
         
         combined_prompt = f"""
-Ты — профессиональный юрист-эксперт с 15-летним стажем по анализу юридических документов. 
-Твоя задача — найти ВСЕ риски и извлечь ВСЕ данные для защиты интересов пользователя.
+Ты — профессиональный юрист-эксперт. Проанализируй документ и верни ТОЛЬКО валидный JSON.
 
-📄 ТЕКСТ ДОКУМЕНТА:
+ТЕКСТ:
 {text[:4500]}
 
-⚖️ ИНСТРУКЦИЯ ПО АНАЛИЗУ:
-
-1. **Определи тип документа** максимально точно
-2. **Извлеки ВСЕ числовые данные** (суммы, даты, проценты)
-3. **Найди ВСЕ риски** — даже скрытые и косвенные
-4. **Проверь обязательные реквизиты** для этого типа документа
-5. **Оцени защитённость слабой стороны** (заёмщик, арендатор, исполнитель)
-
-📋 ФОРМАТ ОТВЕТА (строго валидный JSON без markdown):
-
+ФОРМАТ ОТВЕТА (строгий JSON):
 {{
   "extracted_data": {{
-    "document_type": "contract|invoice|act|application|agreement|certificate|other",
-    "document_subtype": "loan|microloan|rental|service|purchase|employment|lease|other",
-    "document_number": "номер документа или null",
-    "document_date": "YYYY-MM-DD или null",
-    "parties": [
-      {{"name": "Полное название стороны 1", "role": "заёмщик|кредитор|арендодатель|арендатор|исполнитель|заказчик|other", "inn": "ИНН или null", "address": "адрес или null"}}
-    ],
-    "financial_terms": {{
-      "total_amount": число или null,
-      "currency": "RUB|USD|EUR|other",
-      "interest_rate": "процентная ставка текстом",
-      "interest_rate_numeric": число (годовых) или null,
-      "payment_schedule": "график платежей или null",
-      "loan_term_days": число дней или null,
-      "late_fee_percent": процент пени или null,
-      "late_fee_description": "описание пени текстом"
-    }},
-    "dates": {{
-      "signature": "YYYY-MM-DD или null",
-      "start_date": "YYYY-MM-DD или null",
-      "end_date": "YYYY-MM-DD или null",
-      "payment_due": "YYYY-MM-DD или null"
-    }},
-    "obligations": ["конкретное обязательство 1", "конкретное обязательство 2"],
-    "penalties": "полное описание штрафов и пени",
-    "termination_conditions": "условия расторжения или null",
-    "dispute_resolution": "порядок разрешения споров или null",
-    "missing_requisites": ["отсутствующий реквизит 1", "отсутствующий реквизит 2"]
+    "document_type": "contract|invoice|act|application|agreement|other",
+    "document_subtype": "loan|rental|service|other",
+    "document_number": "string or null",
+    "document_date": "YYYY-MM-DD or null",
+    "parties": [{{"name": "str", "role": "str", "inn": "str or null", "address": "str or null"}}],
+    "financial_terms": {{"total_amount": number or null, "currency": "RUB", "interest_rate": "str", "interest_rate_numeric": number or null}},
+    "dates": {{"signature": "YYYY-MM-DD or null", "start_date": "YYYY-MM-DD or null", "end_date": "YYYY-MM-DD or null"}},
+    "obligations": ["str"],
+    "penalties": "str or null",
+    "termination_conditions": "str or null",
+    "dispute_resolution": "str or null",
+    "missing_requisites": ["str"]
   }},
-  "risk_flags": [
-    {{
-      "level": "critical|high|medium|low",
-      "category": "financial|legal|operational|compliance|reputation",
-      "title": "Короткий заголовок риска",
-      "description": "Подробное описание риска с цитатой из документа",
-      "legal_basis": "ссылка на закон/статью или null",
-      "suggestion": "Конкретное действие для минимизации риска",
-      "impact": "Что будет если игнорировать"
-    }}
-  ],
-  "action_items": [
-    {{"priority": "high|medium|low", "action": "Конкретное действие", "deadline": "рекомендуемый срок"}}
-  ],
-  "summary": "Профессиональное резюме на 3-4 предложения с выводами о надёжности документа",
-  "confidence_score": число от 0.0 до 1.0,
-  "analysis_notes": "Дополнительные заметки эксперта о документе"
+  "risk_flags": [{{"level": "critical|high|medium|low", "category": "str", "title": "str", "description": "str", "legal_basis": "str or null", "suggestion": "str", "impact": "str or null"}}],
+  "action_items": [{{"priority": "high|medium|low", "action": "str", "deadline": "str or null"}}],
+  "summary": "str",
+  "confidence_score": 0.0-1.0,
+  "analysis_notes": "str or null"
 }}
-
-🔍 ОБЯЗАТЕЛЬНЫЕ ПРОВЕРКИ НА РИСКИ:
-
-**Для займов/кредитов:**
-- Проверь ставку на соответствие ГК РФ (ст. 395, 809)
-- Найди скрытые комиссии
-- Проверь расчёт полной стоимости кредита (ПСК)
-- Проверь законность пени (не более 0.1% в день по ст. 395 ГК)
-
-**Для договоров:**
-- Проверь существенные условия (предмет, цена, срок)
-- Найди односторонние преимущества
-- Проверь условия расторжения
-
-**Для всех документов:**
-- Отсутствуют обязательные реквизиты?
-- Есть двусмысленные формулировки?
-- Нарушаются права слабой стороны?
-- Есть условия о подсудности в неудобном городе?
-
-⚠️ ВАЖНО:
-- Если данных недостаточно — ставь null, не выдумывай
-- confidence_score < 0.5 если документ плохо читаем
-- level: "critical" если есть риск потери денег или суда
-- Возвращай ТОЛЬКО JSON, без текста до и после
 """
         response = self.gpt.call_gpt(combined_prompt, max_tokens=1200)
         
@@ -342,61 +313,45 @@ class DocumentAgent:
             data = json.loads(response[start:end])
         except Exception as e:
             logger.warning(f"JSON parse error: {e}")
-            data = {
-                "extracted_data": {"document_type": "other", "parties": [], "financial_terms": {}, "dates": {}, "obligations": [], "penalties": None},
-                "risk_flags": [],
-                "action_items": ["Проверить документ вручную"],
-                "summary": "Не удалось проанализировать документ",
-                "confidence_score": 0.3
-            }
+            data = {"extracted_data": {"document_type": "other", "parties": [], "financial_terms": {}, "dates": {}, "obligations": []}, "risk_flags": [], "action_items": [], "summary": "Ошибка анализа", "confidence_score": 0.3}
         
-        # ✅ ИСПРАВЛЕНА СБОРКА ОБЪЕКТА
         ext = data.get("extracted_data", {})
         financial_raw = ext.get("financial_terms", {}) or {}
         dates_raw = ext.get("dates", {}) or {}
         parties_raw = ext.get("parties") or []
         
-        # Безопасное создание parties
         parties_list = []
         for p in parties_raw:
             if isinstance(p, dict):
                 try:
                     parties_list.append(Party(**p))
-                except Exception as e:
-                    logger.warning(f"Error parsing party: {e}")
+                except:
                     parties_list.append(Party(name=str(p.get("name", "Unknown")), role=p.get("role", "other")))
             else:
                 parties_list.append(Party(name=str(p), role="other"))
         
-        # Безопасное создание risk_flags
         risk_flags_list = []
         for f in (data.get("risk_flags") or []):
             try:
                 level_str = f.get("level", "low").lower()
-                # ✅ Преобразуем уровень риска в Enum
                 if level_str not in ["low", "medium", "high", "critical"]:
                     level_str = "low"
                 risk_flags_list.append(RiskFlag(
-                    level=RiskLevel(level_str),
-                    category=f.get("category", "other"),
-                    title=f.get("title"),
-                    description=f.get("description", ""),
-                    legal_basis=f.get("legal_basis"),
-                    suggestion=f.get("suggestion", ""),
+                    level=RiskLevel(level_str), category=f.get("category", "other"),
+                    title=f.get("title"), description=f.get("description", ""),
+                    legal_basis=f.get("legal_basis"), suggestion=f.get("suggestion", ""),
                     impact=f.get("impact")
                 ))
-            except Exception as e:
-                logger.warning(f"Error parsing risk flag: {e}")
+            except:
+                pass
         
-        # Безопасное создание action_items
         action_items_list = []
         for a in (data.get("action_items") or []):
             if isinstance(a, dict):
                 try:
                     action_items_list.append(ActionItem(**a))
-                except Exception as e:
-                    logger.warning(f"Error parsing action item: {e}")
-                    action_items_list.append(ActionItem(action=str(a.get("action", "Check manually"))))
+                except:
+                    action_items_list.append(ActionItem(action=str(a.get("action", "Check"))))
             else:
                 action_items_list.append(ActionItem(action=str(a)))
         
@@ -412,10 +367,6 @@ class DocumentAgent:
                     currency=financial_raw.get("currency", "RUB"),
                     interest_rate=financial_raw.get("interest_rate"),
                     interest_rate_numeric=financial_raw.get("interest_rate_numeric"),
-                    payment_schedule=financial_raw.get("payment_schedule"),
-                    loan_term_days=financial_raw.get("loan_term_days"),
-                    late_fee_percent=financial_raw.get("late_fee_percent"),
-                    late_fee_description=financial_raw.get("late_fee_description"),
                 ),
                 dates=DatesData(
                     signature=dates_raw.get("signature"),
@@ -437,11 +388,10 @@ class DocumentAgent:
         )
         
         _analysis_cache[text_hash] = result
-        logger.info(f"💾 Результат сохранён в кэш (всего: {len(_analysis_cache)})")
         return result
 
 # ==================== FASTAPI APP ====================
-app = FastAPI(title="DocuBot API", description="AI-агент для анализа документов", version="0.3.1")
+app = FastAPI(title="DocuBot API", description="AI-агент для анализа документов", version="0.3.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -451,9 +401,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Инициализация
 init_db()
-logger.info("✅ Database initialized")
+logger.info("Database initialized")
 
 FOLDER_ID = os.getenv("YANDEX_FOLDER_ID", "b1gdcuaq0il54iojm93b")
 gpt_service = YandexGPTService(FOLDER_ID)
@@ -462,112 +411,59 @@ agent = DocumentAgent(gpt_service)
 # ==================== PUBLIC ENDPOINTS ====================
 @app.get("/")
 async def root():
-    return {"message": "DocuBot API работает!", "version": "0.3.1"}
+    return {"message": "DocuBot API работает!", "version": "0.3.2"}
 
 @app.get("/health")
 async def health_check():
     return {"status": "ok"}
 
-@app.get("/cache/stats")
-async def cache_stats():
-    return {"cache_size": len(_analysis_cache), "cache_info": get_text_hash.cache_info()}
-
 # ==================== AUTH ENDPOINTS ====================
 @app.post("/auth/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
-    """Регистрация нового пользователя"""
     db_user = get_user(db, email=user.email)
     if db_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email уже зарегистрирован"
-        )
-    
+        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
     new_user = create_user(db=db, user=user)
-    logger.info(f"✅ Новый пользователь: {new_user.email}")
+    logger.info(f"Новый пользователь: {new_user.email}")
     return new_user
 
 @app.post("/auth/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """Вход пользователя"""
     user = get_user(db, email=form_data.username)
     if not user or not verify_password(form_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Неверный email или пароль",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        raise HTTPException(status_code=401, detail="Неверный email или пароль", headers={"WWW-Authenticate": "Bearer"})
+    access_token = create_access_token(data={"sub": user.id}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    logger.info(f"Вход: {user.email}")
+    return {"access_token": access_token, "token_type": "bearer", "user_id": user.id, "email": user.email}
     
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    
-    logger.info(f"✅ Вход: {user.email}")
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user_id": user.id,
-        "email": user.email
-    }
-
 @app.get("/auth/me", response_model=UserResponse)
 async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Получить информацию о текущем пользователе"""
     return current_user
 
 # ==================== PROTECTED ENDPOINTS ====================
 @app.post("/api/analyze", response_model=DocumentUploadResponse)
-async def analyze_document(
-    file: UploadFile = File(..., description="PDF файл до 10MB"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    logger.info(f"📁 Анализ от пользователя: {current_user.email}, файл: {file.filename}")
+async def analyze_document(file: UploadFile = File(...), db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    logger.info(f"Анализ: {current_user.email}, файл: {file.filename}")
     
-    # 🔒 ПРОВЕРКА 1: Расширение файла
     file_ext = os.path.splitext(file.filename.lower())[1]
     if file_ext not in ALLOWED_EXTENSIONS:
-        logger.warning(f"❌ Запрещённое расширение: {file_ext}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Только PDF файлы. Получено: {file_ext}"
-        )
-    
-    # 🔒 ПРОВЕРКА 2: MIME-type
+        raise HTTPException(status_code=400, detail=f"Только PDF. Получено: {file_ext}")
     if file.content_type not in ALLOWED_MIME_TYPES:
-        logger.warning(f"❌ Запрещённый MIME-type: {file.content_type}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Неверный тип файла: {file.content_type}"
-        )
+        raise HTTPException(status_code=400, detail=f"Неверный тип: {file.content_type}")
     
     try:
-        # 🔒 ПРОВЕРКА 3: Чтение и размер
         content = await file.read()
-        file_size = len(content)
-        
-        if file_size == 0:
+        if len(content) == 0:
             raise HTTPException(400, "Файл пустой")
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=413, detail=f"Файл > 10MB")
         
-        if file_size > MAX_FILE_SIZE:
-            logger.warning(f"❌ Файл слишком большой: {file_size / 1024 / 1024:.2f} MB")
-            raise HTTPException(
-                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Файл > 10MB: {file_size / 1024 / 1024:.2f} MB"
-            )
-        
-        logger.info(f"✅ Файл принят: {file.filename}, {file_size / 1024:.1f} KB")
-        
-        # 📄 Извлечение текста
         text = agent.extract_text_from_pdf(content)
         if not text or len(text.strip()) < 10:
-            raise HTTPException(400, "Не удалось извлечь текст из PDF")
+            raise HTTPException(400, "Не удалось извлечь текст")
         
-        # 🤖 AI анализ
         result = agent.analyze_document(text)
         
-        # 💾 Сохранение в БД (исправлено: JSON для parties + ensure_ascii)
         try:
             history = AnalysisHistory(
                 filename=file.filename,
@@ -584,215 +480,168 @@ async def analyze_document(
             db.add(history)
             db.commit()
         except Exception as e:
-            logger.error(f"❌ Ошибка БД: {e}")
+            logger.error(f"Ошибка БД: {e}")
             db.rollback()
         
         return DocumentUploadResponse(status="success", result=result)
-        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Ошибка: {str(e)}")
+        logger.error(f"Ошибка: {str(e)}")
         return DocumentUploadResponse(status="error", error=str(e))
-        
+
 @app.get("/api/history")
 async def get_history(limit: int = 10, skip: int = 0, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        analyses = db.query(AnalysisHistory).filter(
-            AnalysisHistory.user_id == str(current_user.id)
-        ).order_by(desc(AnalysisHistory.created_at)).offset(skip).limit(limit).all()
-        return {
-            "status": "success",
-            "count": len(analyses),
-            "analyses": [
-                {
-                    "id": a.id,
-                    "filename": a.filename,
-                    "document_type": a.document_type,
-                    "created_at": a.created_at.isoformat(),
-                    "confidence_score": a.confidence_score,
-                    "risk_count": a.risk_count
-                } for a in analyses
-            ]
-        }
+        analyses = db.query(AnalysisHistory).filter(AnalysisHistory.user_id == str(current_user.id)).order_by(desc(AnalysisHistory.created_at)).offset(skip).limit(limit).all()
+        return {"status": "success", "count": len(analyses), "analyses": [{"id": a.id, "filename": a.filename, "document_type": a.document_type, "created_at": a.created_at.isoformat(), "confidence_score": a.confidence_score, "risk_count": a.risk_count} for a in analyses]}
     except Exception as e:
-        logger.error(f"Error fetching history: {e}")
+        logger.error(f"Error: {e}")
         return {"status": "error", "error": str(e)}
 
 @app.get("/api/stats")
 async def get_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        base_query = db.query(AnalysisHistory).filter(AnalysisHistory.user_id == str(current_user.id))
-        total_documents = base_query.count()
-        contracts = base_query.filter(AnalysisHistory.document_type == "contract").count()
-        invoices = base_query.filter(AnalysisHistory.document_type == "invoice").count()
-        acts = base_query.filter(AnalysisHistory.document_type == "act").count()
-        avg_confidence = db.query(func.avg(AnalysisHistory.confidence_score)).filter(
-            AnalysisHistory.user_id == str(current_user.id)
-        ).scalar() or 0
-        total_risks = db.query(func.sum(AnalysisHistory.risk_count)).filter(
-            AnalysisHistory.user_id == str(current_user.id)
-        ).scalar() or 0
-        
-        return {
-            "status": "success",
-            "total_documents": total_documents,
-            "by_type": {
-                "contract": contracts,
-                "invoice": invoices,
-                "act": acts,
-                "other": total_documents - contracts - invoices - acts
-            },
-            "avg_confidence": round(avg_confidence, 2),
-            "total_risks": total_risks
-        }
+        base = db.query(AnalysisHistory).filter(AnalysisHistory.user_id == str(current_user.id))
+        total = base.count()
+        contracts = base.filter(AnalysisHistory.document_type == "contract").count()
+        avg_conf = db.query(func.avg(AnalysisHistory.confidence_score)).filter(AnalysisHistory.user_id == str(current_user.id)).scalar() or 0
+        total_risks = db.query(func.sum(AnalysisHistory.risk_count)).filter(AnalysisHistory.user_id == str(current_user.id)).scalar() or 0
+        return {"status": "success", "total_documents": total, "by_type": {"contract": contracts, "invoice": 0, "act": 0, "other": total - contracts}, "avg_confidence": round(avg_conf, 2), "total_risks": total_risks}
     except Exception as e:
-        logger.error(f"Error fetching stats: {e}")
+        logger.error(f"Stats error: {e}")
         return {"status": "error", "error": str(e)}
 
-# ==================== PDF GENERATION ====================
+# ==================== PDF GENERATION (ИСПРАВЛЕННАЯ ВЕРСИЯ) ====================
 @app.get("/api/generate-pdf/{analysis_id}")
 async def generate_pdf(analysis_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    """Генерация PDF отчёта с поддержкой кириллицы"""
+    """Генерация PDF отчёта с кириллицей и улучшенным дизайном"""
     
     analysis = db.query(AnalysisHistory).filter(
         AnalysisHistory.id == analysis_id,
         AnalysisHistory.user_id == str(current_user.id)
     ).first()
-    
     if not analysis:
         raise HTTPException(404, "Analysis not found")
 
-    # 🔧 РЕГИСТРАЦИЯ ШРИФТОВ (Windows + Linux)
-    import sys
-    main_font = 'Helvetica'
-    bold_font = 'Helvetica-Bold'
-    
-    font_paths = []
-    if sys.platform == 'win32':
-        # Windows пути
-        font_paths = [
-            os.path.join(os.path.dirname(__file__), 'fonts', 'DejaVuSans.ttf'),
-            os.path.join(os.getcwd(), 'fonts', 'DejaVuSans.ttf'),
-        ]
-    else:
-        # Linux пути
-        font_paths = [
-            '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
-            '/usr/share/fonts/dejavu/DejaVuSans.ttf',
-        ]
-    
-    for fpath in font_paths:
-        if os.path.exists(fpath):
-            try:
-                pdfmetrics.registerFont(TTFont('CyrFont', fpath))
-                main_font = 'CyrFont'
-                bold_font = 'CyrFont'
-                logger.info(f"✅ Шрифт загружен: {fpath}")
-                break
-            except Exception as e:
-                logger.warning(f"⚠️ Ошибка шрифта {fpath}: {e}")
-    
-    if main_font == 'Helvetica':
-        logger.error("❌ Шрифт с кириллицей не найден!")
-
-       # 🔧 ГЕНЕРАЦИЯ PDF
     buffer = BytesIO()
-    p = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-    y = height - 50
-
-    p.setFont(bold_font, 24)
-    p.drawString(50, y, "DocuBot AI - Analysis Report")
-    y -= 50
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=40, leftMargin=40, topMargin=50, bottomMargin=40)
+    story = []
     
-    p.setFont(bold_font, 14)
-    p.drawString(50, y, "📋 Основная информация")
-    y -= 30
-    p.setFont(main_font, 11)
-
-    # Парсинг full_result
+    # === 🎨 СТИЛИ (СНАЧАЛА!) ===
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(name='MainRu', fontName=DEFAULT_FONT, fontSize=11, leading=14, textColor=colors.HexColor('#1e293b'), encoding='utf-8'))
+    styles.add(ParagraphStyle(name='BoldRu', fontName=BOLD_FONT, fontSize=14, leading=18, spaceAfter=10, textColor=colors.HexColor('#0f172a'), encoding='utf-8'))
+    styles.add(ParagraphStyle(name='SmallRu', fontName=DEFAULT_FONT, fontSize=9, leading=12, textColor=colors.HexColor('#64748b'), encoding='utf-8'))
+    styles.add(ParagraphStyle(name='TitleRu', fontName=BOLD_FONT, fontSize=20, leading=24, spaceAfter=8, alignment=1, encoding='utf-8'))
+    
+    # Цвета для рисков
+    RISK_COLORS = {
+        'critical': {'bg': '#fef2f2', 'border': '#dc2626', 'text': '#b91c1c'},
+        'high': {'bg': '#fff7ed', 'border': '#ea580c', 'text': '#c2410c'},
+        'medium': {'bg': '#fffbeb', 'border': '#ca8a04', 'text': '#a16207'},
+        'low': {'bg': '#f0fdf4', 'border': '#16a34a', 'text': '#15803d'},
+    }
+    
+    # === 🖼️ ЛОГОТИП ===
+    story.append(Paragraph(f"<font name='{BOLD_FONT}' size=22 color='#2563eb'>DocuBot</font><font name='{DEFAULT_FONT}' size=22 color='#64748b'> AI</font>", styles['TitleRu']))
+    story.append(Paragraph(f"<font name='{DEFAULT_FONT}' size=9 color='#94a3b8'>Отчёт: {datetime.now().strftime('%d.%m.%Y %H:%M')}</font>", styles['SmallRu']))
+    story.append(Spacer(1, 15))
+    story.append(Paragraph("<para align='center'><font color='#e2e8f0'>{'─' * 60}</font></para>", styles['SmallRu']))
+    story.append(Spacer(1, 20))
+    
+    # Парсинг данных
     try:
         full_result = json.loads(analysis.full_result) if isinstance(analysis.full_result, str) else analysis.full_result
     except:
         full_result = {}
-    
     ext = full_result.get('extracted_data', {})
     
-    p.drawString(50, y, f"Тип: {ext.get('document_type', 'N/A')}")
-    y -= 20
+    # === 📋 ОСНОВНАЯ ИНФОРМАЦИЯ ===
+    story.append(Paragraph("Основная информация", styles['BoldRu']))
     
-    # 🔧 ИСПРАВЛЕНИЕ: parties — список словарей, извлекаем имена
     parties = ext.get('parties', [])
-    if isinstance(parties, list) and parties:
-        party_names = []
-        for p_item in parties:
-            if isinstance(p_item, dict):
-                party_names.append(p_item.get('name', 'Unknown'))
-            else:
-                party_names.append(str(p_item))
-        parties_str = ', '.join(party_names)
-    else:
-        parties_str = 'N/A'
-    p.drawString(50, y, f"Стороны: {parties_str}")
-    y -= 20
+    party_names = [p.get('name', 'Unknown') if isinstance(p, dict) else str(p) for p in parties] if isinstance(parties, list) else ['N/A']
     
-    p.drawString(50, y, f"Сумма: {ext.get('total_amount', 'N/A')} {ext.get('currency', '')}")
-    y -= 50
-
-    # Риски
-    p.setFont(bold_font, 14)
-    p.drawString(50, y, f"⚠️ Риски ({len(full_result.get('risk_flags', []))})")
-    y -= 30
-    for flag in full_result.get('risk_flags', []):
-        p.setFont(main_font, 10)
-        level = flag.get('level', '').upper()
-        p.drawString(50, y, f"• {level} - {flag.get('category', '')}: {flag.get('description', '')}")
-        y -= 20
-        if y < 100:
-            p.showPage()
-            y = height - 50
-
-    # 🔧 ИСПРАВЛЕНИЕ: Рекомендации (action_items может быть dict)
-    p.setFont(bold_font, 14)
-    p.drawString(50, y, "✅ Рекомендации")
-    y -= 30
-    for i, item in enumerate(full_result.get('action_items', []), 1):
-        p.setFont(main_font, 10)
-        # Если item — словарь, берём поле 'action', иначе конвертируем в строку
-        action_text = item.get('action', str(item)) if isinstance(item, dict) else str(item)
-        p.drawString(50, y, f"{i}. {action_text}")
-        y -= 20
-        if y < 100:
-            p.showPage()
-            y = height - 50
-
-    # Резюме
-    p.setFont(bold_font, 14)
-    p.drawString(50, y, "📝 Резюме")
-    y -= 30
-    p.setFont(main_font, 11)
-    summary = full_result.get('summary', '')
-    words = summary.split()
-    line = ""
-    for word in words:
-        if len(line) + len(word) < 70:
-            line += word + "  "
-        else:
-            p.drawString(50, y, line)
-            y -= 18
-            line = word + "  "
-            if y < 100:
-                p.showPage()
-                y = height - 50
-    if line:
-        p.drawString(50, y, line)
-
-    p.save()
+    table_data = [
+        [Paragraph("Тип документа", styles['BoldRu']), Paragraph(ext.get('document_type', 'N/A'), styles['MainRu'])],
+        [Paragraph("Стороны", styles['BoldRu']), Paragraph(', '.join(party_names), styles['MainRu'])],
+        [Paragraph("Сумма", styles['BoldRu']), Paragraph(f"{ext.get('financial_terms', {}).get('total_amount', 'N/A')} {ext.get('financial_terms', {}).get('currency', '')}", styles['MainRu'])],
+        [Paragraph("Дата документа", styles['BoldRu']), Paragraph(ext.get('document_date', 'N/A'), styles['MainRu'])],
+    ]
+    
+    table = Table(table_data, colWidths=[150, 300])
+    table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), DEFAULT_FONT),
+        ('FONTNAME', (0, 0), (0, -1), BOLD_FONT),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('LEADING', (0, 0), (-1, -1), 14),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#e2e8f0')),
+        ('PADDING', (0, 0), (-1, -1), 8),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8fafc')),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#f1f5f9')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.HexColor('#1e293b')),
+        ('FONTNAME', (0, 0), (-1, 0), BOLD_FONT),
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 20))
+    
+    # === ⚠️ РИСКИ ===
+    risks = full_result.get('risk_flags', [])
+    if risks:
+        story.append(Paragraph(f"Риски ({len(risks)})", styles['BoldRu']))
+        for flag in risks:
+            level = flag.get('level', 'low').lower() if isinstance(flag, dict) else 'low'
+            colors_cfg = RISK_COLORS.get(level, RISK_COLORS['low'])
+            
+            story.append(Paragraph(
+                f"<para backColor='{colors_cfg['bg']}' borderPadding='5' borderColor='{colors_cfg['border']}' borderWidth='1' borderPadding='3'>"
+                f"<font name='{BOLD_FONT}' color='{colors_cfg['text']}'>[{level.upper()}]</font> "
+                f"<font name='{BOLD_FONT}'>{flag.get('title') or flag.get('category', 'Риск')}</font>"
+                f"</para>",
+                styles['MainRu']
+            ))
+            
+            story.append(Paragraph(f"<font name='{DEFAULT_FONT}'>{flag.get('description', '')}</font>", styles['MainRu']))
+            
+            if flag.get('suggestion'):
+                story.append(Paragraph(f"<font name='{DEFAULT_FONT}' color='#059669'>💡 {flag.get('suggestion')}</font>", styles['SmallRu']))
+            
+            story.append(Spacer(1, 12))
+    
+    # === ✅ РЕКОМЕНДАЦИИ ===
+    actions = full_result.get('action_items', [])
+    if actions:
+        story.append(Paragraph("Рекомендации", styles['BoldRu']))
+        for i, item in enumerate(actions[:5], 1):
+            action_text = item.get('action', str(item)) if isinstance(item, dict) else str(item)
+            story.append(Paragraph(f"{i}. <font name='{DEFAULT_FONT}'>{action_text}</font>", styles['MainRu']))
+        story.append(Spacer(1, 15))
+    
+    # === 📝 РЕЗЮМЕ ===
+    story.append(Paragraph("Резюме", styles['BoldRu']))
+    summary = full_result.get('summary', 'Нет данных')
+    story.append(Paragraph(f"<font name='{DEFAULT_FONT}'>{summary}</font>", styles['MainRu']))
+    
+    # Футер с уверенностью
+    conf = full_result.get('confidence_score', 0)
+    conf_color = '#22c55e' if conf >= 0.7 else '#eab308' if conf >= 0.4 else '#ef4444'
+    story.append(Spacer(1, 20))
+    story.append(Paragraph(f"<font name='{DEFAULT_FONT}' size=9 color='{conf_color}'>Уверенность анализа: {conf*100:.0f}%</font>", styles['SmallRu']))
+    
+    # Нумерация страниц
+    def add_page_number(canvas, doc):
+        canvas.setFont(DEFAULT_FONT, 8)
+        canvas.setFillColor(colors.gray)
+        canvas.drawString(doc.pagesize[0]/2 - 30, 20, f"Стр. {canvas.getPageNumber()}")
+    
+    doc.build(story, onFirstPage=add_page_number, onLaterPages=add_page_number)
     buffer.seek(0)
     
-    return StreamingResponse(
-        buffer,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"attachment; filename=docubot-analysis-{analysis_id}.pdf"}
-    )
+    return StreamingResponse(buffer, media_type="application/pdf", headers={"Content-Disposition": f"attachment; filename=docubot-report-{analysis_id}.pdf"})
+
+# ==================== ЗАПУСК ====================
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main_simple:app", host="0.0.0.0", port=10000, reload=True)
