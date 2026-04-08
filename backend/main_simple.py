@@ -395,10 +395,14 @@ app = FastAPI(title="DocuBot API", description="AI-агент для анали�
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://docubot-three.vercel.app",  # Твой фронтенд
+        "http://localhost:3000",              # Локальная разработка
+        "http://localhost:8000",
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Все методы (GET, POST, etc.)
+    allow_headers=["*"],  # Все заголовки
 )
 
 init_db()
