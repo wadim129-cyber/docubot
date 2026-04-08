@@ -404,9 +404,20 @@ app.add_middleware(
     allow_methods=["*"],  # Все методы (GET, POST, etc.)
     allow_headers=["*"],  # Все заголовки
 )
+# ==================== ПРИМЕНЕНИЕ МИГРАЦИЙ ====================
+import subprocess
+import sys
+
+try:
+    print("🔄 Applying Alembic migrations...")
+    subprocess.check_call([sys.executable, "-m", "alembic", "upgrade", "head"])
+    print("✅ Migrations applied successfully!")
+except Exception as e:
+    print(f"⚠️ Migration error (continuing anyway): {e}")
+# =============================================================
 
 init_db()
-logger.info("Database initialized")
+logger.info("Database initialized with indexes")
 
 FOLDER_ID = os.getenv("YANDEX_FOLDER_ID", "b1gdcuaq0il54iojm93b")
 gpt_service = YandexGPTService(FOLDER_ID)
